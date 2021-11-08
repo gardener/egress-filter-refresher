@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2021 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
 FROM alpine:3.14.2
 
 ADD update-filter-list.sh /update-filter-list.sh
