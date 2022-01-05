@@ -14,7 +14,11 @@ egress-filter-refresher:
                 source: ~ # default
             registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/egress-filter-refresher'
-            dockerfile: 'Dockerfile'
+            dockerfile: 'updater/Dockerfile'
+          egress-filter-blackholer:
+            registry: 'gcr-readwrite'
+            image: 'eu.gcr.io/gardener-project/gardener/egress-filter-blackholer'
+            dockerfile: 'blackholer/Dockerfile'
     steps: ~
   jobs:
     head-update:
