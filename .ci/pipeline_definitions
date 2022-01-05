@@ -19,6 +19,10 @@ egress-filter-refresher:
             registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/egress-filter-blackholer'
             dockerfile: 'blackholer/Dockerfile'
+          egress-filter-firewaller:
+            registry: 'gcr-readwrite'
+            image: 'eu.gcr.io/gardener-project/gardener/egress-filter-firewaller'
+            dockerfile: 'firewaller/Dockerfile'
     steps: ~
   jobs:
     head-update:
