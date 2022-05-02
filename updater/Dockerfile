@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM alpine:3.14.2
+FROM alpine:3.15.4
 
 ADD updater/update-filter-list.sh /update-filter-list.sh
 RUN chmod +x /update-filter-list.sh; \

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM alpine:3.14.2
+FROM alpine:3.15.4
 
 ADD firewaller/update-firewall.sh /update-firewall.sh
 RUN chmod +x /update-firewall.sh; \
