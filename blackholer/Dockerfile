@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM alpine:3.14.2
+FROM alpine:3.15.4
 
 ADD blackholer/update-blackholes.sh /update-blackholes.sh
 RUN chmod +x /update-blackholes.sh; \
