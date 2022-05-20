@@ -33,7 +33,8 @@ function update {
     echo "Ipset \"$2\" initially created successfully."
     local DEFAULT_NET_DEVICE=`ip route | grep default | awk '{print $5}'`
     echo "Initially creating ip${1}tables rule for device \"${DEFAULT_NET_DEVICE}\" referencing ipset..."
-    ip${1}tables -t mangle -A POSTROUTING -o ${DEFAULT_NET_DEVICE} -m set --match-set $2 dst -j DROP
+    ip${1}tables -t mangle -A POSTROUTING -o ${DEFAULT_NET_DEVICE} -p tcp --syn -m set --match-set $2 dst -j DROP
+    ip${1}tables -t mangle -A POSTROUTING -o ${DEFAULT_NET_DEVICE} -p udp -m set --match-set $2 dst -j DROP
     echo "Initial ip${1}tables rule for device \"${DEFAULT_NET_DEVICE}\" created successfully."
   else
     set -e
