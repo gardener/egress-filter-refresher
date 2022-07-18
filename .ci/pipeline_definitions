@@ -12,13 +12,6 @@ egress-filter-refresher:
         - linux/amd64
         - linux/arm64
         dockerimages:
-          egress-filter-refresher:
-            inputs:
-              repos:
-                source: ~ # default
-            registry: 'gcr-readwrite'
-            image: 'eu.gcr.io/gardener-project/gardener/egress-filter-refresher'
-            dockerfile: 'updater/Dockerfile'
           egress-filter-blackholer:
             registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/egress-filter-blackholer'
