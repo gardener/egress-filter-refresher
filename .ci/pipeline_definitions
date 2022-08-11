@@ -43,3 +43,7 @@ egress-filter-refresher:
               slack_cfg_name: 'scp_workspace'
         component_descriptor:
           component_name: 'github.com/gardener/egress-filter-refresher'
+          component_labels:
+          - name: 'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1'
+            value:
+              policy: 'skip'
