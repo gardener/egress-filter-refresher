@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-FROM alpine:3.16.2 as builder
+FROM alpine:3.16.3 as builder
 
 WORKDIR /volume
 
