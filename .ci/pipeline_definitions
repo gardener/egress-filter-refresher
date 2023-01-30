@@ -16,10 +16,28 @@ egress-filter-refresher:
             registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/egress-filter-blackholer'
             dockerfile: 'blackholer/Dockerfile'
+            resource_labels:
+            - name: 'gardener.cloud/cve-categorisation'
+              value:
+                network_exposure: 'private'
+                authentication_enforced: false
+                user_interaction: 'end-user'
+                confidentiality_requirement: 'high'
+                integrity_requirement: 'high'
+                availability_requirement: 'high'
           egress-filter-firewaller:
             registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/egress-filter-firewaller'
             dockerfile: 'firewaller/Dockerfile'
+            resource_labels:
+            - name: 'gardener.cloud/cve-categorisation'
+              value:
+                network_exposure: 'private'
+                authentication_enforced: false
+                user_interaction: 'end-user'
+                confidentiality_requirement: 'high'
+                integrity_requirement: 'high'
+                availability_requirement: 'high'
     steps: ~
   jobs:
     head-update:
