@@ -3,6 +3,12 @@ egress-filter-refresher:
   base_definition:
     repo: ~
     traits:
+      component_descriptor:
+        component_labels:
+        - name: 'cloud.gardener.cnudie/responsibles'
+          value:
+          - type: 'codeowners'
+        retention_policy: 'clean-snapshots'
       version:
         preprocess:
           'inject-commit-hash'
@@ -43,7 +49,6 @@ egress-filter-refresher:
     head-update:
       traits:
         draft_release: ~
-        component_descriptor: ~
     pull-request:
       traits:
         pull-request: ~
