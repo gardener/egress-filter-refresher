@@ -5,19 +5,52 @@
 VERSION                     := $(shell cat VERSION)
 REGISTRY                    := eu.gcr.io/gardener-project/gardener
 PREFIX                      := egress-filter
-BLACKHOLER_IMAGE_REPOSITORY := $(REGISTRY)/$(PREFIX)-blackholer
-BLACKHOLER_IMAGE_TAG        := $(VERSION)
-FIREWALLER_IMAGE_REPOSITORY := $(REGISTRY)/$(PREFIX)-firewaller
-FIREWALLER_IMAGE_TAG        := $(VERSION)
+IMAGE_REPOSITORY            := $(REGISTRY)/$(PREFIX)
+IMAGE_TAG                   := $(VERSION)
+EFFECTIVE_VERSION           := $(VERSION)-$(shell git rev-parse HEAD)
+GOARCH                      := amd64
+REPO_ROOT                   := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-PATH              := $(GOBIN):$(PATH)
 
-export PATH
+.PHONY: revendor
+revendor:
+	@GO111MODULE=on go mod vendor
+	@GO111MODULE=on go mod tidy
+
+.PHONY: check
+check:
+	go fmt ./...
+	go vet ./...
+
+.PHONY: test
+test:
+	go test ./...
+	
+
+.PHONY: format
+format:
+	@$(REPO_ROOT)/hack/format.sh ./cmd ./pkg
+	
+.PHONY: verify
+verify: check format test
+
+.PHONY: build
+build: build-filter-updater
+
+.PHONY: install-requirements
+install-requirements:
+	@go install -mod=vendor $(REPO_ROOT)/vendor/golang.org/x/tools/cmd/goimports
+
+.PHONY: build-filter-updater
+build-filter-updater:
+	@CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -o filter-updater \
+        -mod=vendor \
+	    -ldflags "-X 'main.Version=$(EFFECTIVE_VERSION)' -X 'main.ImageTag=$(IMAGE_TAG)'"\
+	    ./cmd/main.go
 
 .PHONY: docker-images
 docker-images:
-	@docker build -t $(BLACKHOLER_IMAGE_REPOSITORY):$(BLACKHOLER_IMAGE_TAG) -f blackholer/Dockerfile --rm .
-	@docker build -t $(FIREWALLER_IMAGE_REPOSITORY):$(FIREWALLER_IMAGE_TAG) -f firewaller/Dockerfile --rm .
+	@docker build -t $(IMAGE_REPOSITORY):$(IMAGE_TAG) -f Dockerfile --rm .
 
 .PHONY: release
 release: docker-images docker-login docker-push
@@ -28,7 +61,5 @@ docker-login:
 
 .PHONY: docker-push
 docker-push:
-	@if ! docker images $(BLACKHOLER_IMAGE_REPOSITORY) | awk '{ print $$2 }' | grep -q -F $(BLACKHOLER_IMAGE_TAG); then echo "$(BLACKHOLER_IMAGE_REPOSITORY) version $(BLACKHOLER_IMAGE_TAG) is not yet built. Please run 'make docker-images'"; false; fi
-	@gcloud docker -- push $(BLACKHOLER_IMAGE_REPOSITORY):$(BLACKHOLER_IMAGE_TAG)
-	@if ! docker images $(FIREWALLER_IMAGE_REPOSITORY) | awk '{ print $$2 }' | grep -q -F $(FIREWALLER_IMAGE_TAG); then echo "$(FIREWALLER_IMAGE_REPOSITORY) version $(FIREWALLER_IMAGE_TAG) is not yet built. Please run 'make docker-images'"; false; fi
-	@gcloud docker -- push $(FIREWALLER_IMAGE_REPOSITORY):$(FIREWALLER_IMAGE_TAG)
+	@if ! docker images $(IMAGE_REPOSITORY) | awk '{ print $$2 }' | grep -q -F $(IMAGE_TAG); then echo "$(IMAGE_REPOSITORY) version $(IMAGE_TAG) is not yet built. Please run 'make docker-images'"; false; fi
+	@gcloud docker -- push $(IMAGE_REPOSITORY):$(IMAGE_TAG)
