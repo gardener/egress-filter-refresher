@@ -22,8 +22,8 @@ var (
 	DefaultNetUtilsCommandExecutor NetUtilsCommandExecutor = &OSNetUtilsCommandExecutor{}
 )
 
-func GetDefaultNetworkDevice() (string, error) {
-	out, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "route", "show", "default")
+func GetDefaultNetworkDevice(ipVersion string) (string, error) {
+	out, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand(ipVersion, "route", "show", "default")
 	if err != nil {
 		return "", err
 	}
@@ -108,11 +108,8 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 	return DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, ipTablesArgs...)
 }
 
-func AddIPTablesLoggingRules(ipVersion string, ipSet string, blockIngress bool) error {
-	defaultNetworkDevice, err := GetDefaultNetworkDevice()
-	if err != nil {
-		return fmt.Errorf("Error getting default network device %v\n", err)
-	}
+func AddIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string, blockIngress bool) error {
+
 	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, blockIngress); err != nil {
 		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, blockIngress)
 		if err != nil {
@@ -129,6 +126,9 @@ func AddIPTablesLoggingRules(ipVersion string, ipSet string, blockIngress bool) 
 }
 
 func InitIPSet(ipVersion, ipSetName string) error {
+	if ipVersion == "4" {
+		ipVersion = ""
+	}
 	fmt.Printf("Initially creating ipset with name %s\n", ipSetName)
 	if err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("list", ipSetName); err != nil {
 		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("create", ipSetName, "hash:net", "family", "inet"+ipVersion, "maxelem", ipSetsMaxLen)
@@ -156,7 +156,7 @@ func prepareAddrs(content string, trimSuffix bool) []string {
 	return res
 }
 
-func AddIPListToIPSet(ipVersion string, ipSetName string, content string) error {
+func AddIPListToIPSet(ipSetName string, content string) error {
 	addrs := prepareAddrs(content, false)
 
 	for _, addr := range addrs {
@@ -168,8 +168,12 @@ func AddIPListToIPSet(ipVersion string, ipSetName string, content string) error 
 	return nil
 }
 
-func UpdateIPSet(ipVersion, ipSetName, egressFilterList string, blockIngress bool) error {
-
+func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice string, blockIngress bool) error {
+	inetVersion := ""
+	if ipVersion == "6" {
+		inetVersion = "6"
+	}
+	
 	defer func() {
 		fmt.Println("Clean-up")
 		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", "tmpIPSet")
@@ -179,20 +183,20 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList string, blockIngress boo
 	}()
 
 	fmt.Printf("Creating temporary ipset with name \"%s\"...\n", "tmpIPSet")
-	err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("create", "tmpIPSet", "hash:net", "family", "inet"+ipVersion, "maxelem", ipSetsMaxLen)
+	err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("create", "tmpIPSet", "hash:net", "family", "inet"+inetVersion, "maxelem", ipSetsMaxLen)
 	if err != nil {
 		return fmt.Errorf("Error creating temporary ipset: %w\n", err)
 	}
 
 	fmt.Printf("Temporary ipset with name \"%s\" created successfully.\n", "tmpIPSet")
 
-	err = AddIPListToIPSet(ipVersion, "tmpIPSet", egressFilterList)
+	err = AddIPListToIPSet("tmpIPSet", egressFilterList)
 	if err != nil {
 		return fmt.Errorf("Error adding entries to temporary ipset: %w\n", err)
 	}
 	fmt.Println("Added entries into temporary ipset successfully.")
 
-	err = AddIPTablesLoggingRules(ipVersion, ipSetName, blockIngress)
+	err = AddIPTablesLoggingRules(ipVersion, ipSetName, defaultNetworkDevice, blockIngress)
 	if err != nil {
 		return fmt.Errorf("Error adding iptables rules %w\n", err)
 	}
@@ -247,8 +251,8 @@ func InitDummyDevice() error {
 			return fmt.Errorf("Error setting up dummy device: %v", err)
 		}
 	}
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("", "-t", "mangle", "-C", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING"); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("", "-t", "mangle", "-A", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING")
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING"); err != nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING")
 		if err != nil {
 			return errors.New(fmt.Sprintf("Error creating ip%stables rule for logging packets to dummy device: %v\n", "", err))
 		}

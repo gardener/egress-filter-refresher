@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/gardener/egress-filter-refresher/pkg/netconfig"
@@ -46,24 +47,40 @@ func updateBlackholeRoutes() {
 
 func updateFirewall(blockIngress bool) {
 	fmt.Println("Check initial setup")
-	netconfig.InitLoggingChain("")
-	netconfig.InitLoggingChain("6")
-	netconfig.InitIPSet("", ipv4IPSetName)
+	netconfig.InitIPSet("4", ipv4IPSetName)
 	netconfig.InitIPSet("6", ipv6IPSetName)
 
+	defaultNetworkDeviceV4, _ := netconfig.GetDefaultNetworkDevice("4")
+	defaultNetworkDeviceV6, _ := netconfig.GetDefaultNetworkDevice("6")
+	
+	if defaultNetworkDeviceV4 == "" && defaultNetworkDeviceV6 == "" {
+		fmt.Println("Error: No default network device found.")
+		os.Exit(1)
+	} else if defaultNetworkDeviceV4 == "" {
+			defaultNetworkDeviceV4 = defaultNetworkDeviceV6
+	} else if defaultNetworkDeviceV6 == "" {
+			defaultNetworkDeviceV6 = defaultNetworkDeviceV4
+	}
+	
+	if defaultNetworkDeviceV4 == "" && defaultNetworkDeviceV6 == "" {
+		fmt.Println("Error: No default network device found.")
+		os.Exit(1)
+	}
+	
 	egressFilterContent, err := ioutil.ReadFile(ipv4EgressFilterList)
 	if err != nil {
 		fmt.Printf("Error reading egress filter list: %v\n", err)
 	}
-	err = netconfig.UpdateIPSet("", ipv4IPSetName, string(egressFilterContent), blockIngress)
+	err = netconfig.UpdateIPSet("4", ipv4IPSetName, string(egressFilterContent), defaultNetworkDeviceV4, blockIngress)
 	if err != nil {
 		fmt.Printf("Error: UpdateIPSet failed for %s: %v\n", ipv4IPSetName, err)
 	}
+
 	egressFilterContent, err = ioutil.ReadFile(ipv6EgressFilterList)
 	if err != nil {
 		fmt.Printf("Error reading egress filter list: %v\n", err)
 	}
-	err = netconfig.UpdateIPSet("6", ipv6IPSetName, string(egressFilterContent), blockIngress)
+	err = netconfig.UpdateIPSet("6", ipv6IPSetName, string(egressFilterContent), defaultNetworkDeviceV6, blockIngress)
 	if err != nil {
 		fmt.Printf("Error: UpdateIPSet failed for %s: %v\n", ipv6IPSetName, err)
 	}
@@ -78,7 +95,7 @@ func main() {
 	fmt.Printf("blackholing enabled: %v\n", blackholing)
 	for {
 		fmt.Println(time.Now())
-		netconfig.InitLoggingChain("")
+		netconfig.InitLoggingChain("4")
 		netconfig.InitLoggingChain("6")
 		if blackholing {
 			err := netconfig.InitDummyDevice()

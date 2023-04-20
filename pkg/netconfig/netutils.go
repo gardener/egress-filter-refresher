@@ -27,6 +27,9 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, args ...string) error {
+	if ipVersion == "4" {
+		ipVersion = ""
+	}
 	args = append([]string{"-w"}, args...)
 	cmd := exec.Command("ip"+ipVersion+"tables", args...)
 	return cmd.Run()
@@ -51,6 +54,9 @@ func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, ar
 }
 
 func (m *MockNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, args ...string) error {
+	if ipVersion == "4" {
+		ipVersion = ""
+	}
 	args = append([]string{"-w"}, args...)
 	cmd := exec.Command("ip"+ipVersion+"tables", args...)
 	m.MockCmds = append(m.MockCmds, cmd)
