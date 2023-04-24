@@ -7,6 +7,7 @@ package netconfig_test
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
 	"testing"
 
 	"github.com/gardener/egress-filter-refresher/pkg/netconfig"
@@ -145,12 +146,17 @@ line with []
 - 9.8.7.16/28
 
 `
+			ipSetScript := `-A test-ipset 1.2.3.4/32
+-A test-ipset 5.6.7.0/24
+-A test-ipset 9.8.7.16/28
+quit
+`
 			err := netconfig.AddIPListToIPSet("test-ipset", ipList)
 			Expect(err).To(BeNil())
-			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(3))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "-A", "test-ipset", "1.2.3.4/32"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"ipset", "-A", "test-ipset", "5.6.7.0/24"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Equal([]string{"ipset", "-A", "test-ipset", "9.8.7.16/28"}))
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "-"}))
+			buf, _ := ioutil.ReadAll(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Stdin)
+			Expect(string(buf)).To(Equal(ipSetScript))
 		})
 	})
 
@@ -165,15 +171,13 @@ line with []
 `
 			err := netconfig.UpdateIPSet("4", "test-ipset", ipList, "ens5", false)
 			Expect(err).To(BeNil())
-			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(8))
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(6))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "create", "tmpIPSet", "hash:net", "family", "inet", "maxelem", "65536"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"ipset", "-A", "tmpIPSet", "1.2.3.4/32"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Equal([]string{"ipset", "-A", "tmpIPSet", "5.6.7.0/24"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[3].Args).To(Equal([]string{"ipset", "-A", "tmpIPSet", "9.8.7.16/28"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[4].Args).To(Equal([]string{"iptables", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "LOGGING"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[5].Args).To(Equal([]string{"iptables", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "LOGGING"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[6].Args).To(Equal([]string{"ipset", "swap", "tmpIPSet", "test-ipset"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[7].Args).To(Equal([]string{"ipset", "destroy", "tmpIPSet"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"ipset", "-"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Equal([]string{"iptables", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[3].Args).To(Equal([]string{"iptables", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[4].Args).To(Equal([]string{"ipset", "swap", "tmpIPSet", "test-ipset"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[5].Args).To(Equal([]string{"ipset", "destroy", "tmpIPSet"}))
 		})
 	})
 
@@ -202,11 +206,10 @@ line with []
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.UpdateRoutes("4", ipList)
 			Expect(err).To(BeNil())
-			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(4))
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(3))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ip", "-4", "route"}))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Or(Equal([]string{"ip", "-4", "route", "add", "5.6.7.0/24", "dev", "dummy0"}), Equal([]string{"ip", "-4", "route", "add", "9.8.7.16/28", "dev", "dummy0"})))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Or(Equal([]string{"ip", "-4", "route", "add", "5.6.7.0/24", "dev", "dummy0"}), Equal([]string{"ip", "-4", "route", "add", "9.8.7.16/28", "dev", "dummy0"})))
-			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[3].Args).To(Equal([]string{"ip", "-4", "route", "del", "5.2.3.4/30"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"ip", "-4", "-batch", "tmpFile"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Equal([]string{"ip", "-4", "-batch", "tmpFile"}))
 
 		})
 		It("correct commands are called, when there is no change", func() {

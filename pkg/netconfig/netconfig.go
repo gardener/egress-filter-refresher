@@ -16,6 +16,7 @@ const (
 	ipTablesLogPrefix    = "Policy-Filter-Dropped:"
 	ipTablesLogLimit     = "10/min"
 	ipTablesLogLevel     = "4"
+	dummyDeviceName      = "dummy0"
 )
 
 var (
@@ -62,6 +63,7 @@ func InitLoggingChain(ipVersion string) error {
 	return nil
 }
 
+// firewaller
 func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, blockIngress bool) error {
 	action := "-A"
 	if check {
@@ -157,14 +159,19 @@ func prepareAddrs(content string, trimSuffix bool) []string {
 }
 
 func AddIPListToIPSet(ipSetName string, content string) error {
+
 	addrs := prepareAddrs(content, false)
 
-	for _, addr := range addrs {
-		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("-A", ipSetName, addr)
-		if err != nil {
-			fmt.Printf("Error: Failed to add %s to ipset %s: %v\n", addr, ipSetName, err)
-		}
+	for i, addr := range addrs {
+		addrs[i] = "-A " + ipSetName + " " + addr
 	}
+	addrs = append(addrs, "quit\n")
+
+	err := DefaultNetUtilsCommandExecutor.ExecuteIPSetScript(strings.Join(addrs, "\n"))
+	if err != nil {
+		return fmt.Errorf("Error adding addresses to ipset %w\n", err)
+	}
+	fmt.Printf("Added %d entries to ipset %s.\n", len(addrs), ipSetName)
 	return nil
 }
 
@@ -173,7 +180,7 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 	if ipVersion == "6" {
 		inetVersion = "6"
 	}
-	
+
 	defer func() {
 		fmt.Println("Clean-up")
 		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", "tmpIPSet")
@@ -241,25 +248,25 @@ func diff(new, old []string) (added, removed []string) {
 
 func InitDummyDevice() error {
 	out, _ := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "show")
-	if !strings.Contains(out.String(), " dummy0: ") {
-		_, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "add", "dummy0", "type", "dummy")
+	if !strings.Contains(out.String(), " "+dummyDeviceName+": ") {
+		_, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "add", dummyDeviceName, "type", "dummy")
 		if err != nil {
 			return fmt.Errorf("Error creating dummy device: %v", err)
 		}
-		_, err = DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "set", "dummy0", "up")
+		_, err = DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "set", dummyDeviceName, "up")
 		if err != nil {
 			return fmt.Errorf("Error setting up dummy device: %v", err)
 		}
 	}
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING"); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING")
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING"); err != nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING")
 		if err != nil {
 			return errors.New(fmt.Sprintf("Error creating ip%stables rule for logging packets to dummy device: %v\n", "", err))
 		}
 	}
 
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING"); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-A", "POSTROUTING", "-o", "dummy0", "-j", "LOGGING")
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING"); err != nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING")
 		if err != nil {
 			return errors.New(fmt.Sprintf("Error creating ip%stables rule for logging packets to dummy device: %v\n", "6", err))
 		}
@@ -278,7 +285,7 @@ func GetBlackholeRoutes(ipVersion string) ([]string, error) {
 
 	lines := strings.Split(ipOut.String(), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "dummy0") && !strings.Contains(line, "fe80::/64") {
+		if strings.Contains(line, dummyDeviceName) && !strings.Contains(line, "fe80::/64") {
 			fields := strings.Fields(line)
 			addr := fields[0]
 			blackholeRoutes = append(blackholeRoutes, addr)
@@ -289,43 +296,50 @@ func GetBlackholeRoutes(ipVersion string) ([]string, error) {
 }
 
 func DeleteRoutes(ipVersion string, addrs []string) error {
-	errorOccurred := false
-	for _, addr := range addrs {
-		fmt.Printf("Delete blackhole route %s\n", addr)
-		out, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand(ipVersion, "route", "del", addr)
-		if err != nil {
-			errorOccurred = true
-			fmt.Printf("error deleting blackhole route %s: %s %v\n", addr, out, err)
-		}
+	if len(addrs) == 0 {
+		return nil
 	}
-	if errorOccurred {
-		return fmt.Errorf("Error deleting blackhole routes\n")
+	fmt.Printf("Deleting %d routes.\n", len(addrs))
+	for i, addr := range addrs {
+		addrs[i] = "route del " + addr + " dev dummy0"
 	}
+	err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteBatchCommand(ipVersion, strings.Join(addrs, "\n"))
+
+	if err != nil {
+		return fmt.Errorf("Error deleting blackhole routes: %v\n", err)
+	}
+	fmt.Printf("Deleted %d routes.\n", len(addrs))
 	return nil
 }
 
 func AddRoutes(ipVersion string, addrs []string) error {
-	errorOccurred := false
-	for _, addr := range addrs {
-		fmt.Printf("Add blackhole route %s\n", addr)
-		out, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand(ipVersion, "route", "add", addr, "dev", "dummy0")
-		if err != nil {
-			errorOccurred = true
-			fmt.Printf("error adding blackhole route %s: %s %v\n", addr, out, err)
-		}
+	if len(addrs) == 0 {
+		return nil
 	}
-	if errorOccurred {
-		return fmt.Errorf("Error deleting blackhole routes\n")
+	fmt.Printf("Adding %d routes.\n", len(addrs))
+	for i, addr := range addrs {
+		addrs[i] = "route add " + addr + " dev dummy0"
 	}
+	err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteBatchCommand(ipVersion, strings.Join(addrs, "\n"))
+
+	if err != nil {
+		return fmt.Errorf("Error adding blackhole routes: %v\n", err)
+	}
+	fmt.Printf("Added %d routes.\n", len(addrs))
 	return nil
 }
 
 func UpdateRoutes(ipVersion string, egressFilterList string) error {
 	newAddrs := prepareAddrs(egressFilterList, true)
+	fmt.Printf("Checking ipv%s egress filter list with %d entries against current settings...\n", ipVersion, len(newAddrs))
+
 	currentAddrs, err := GetBlackholeRoutes(ipVersion)
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Current filter list contains %d entries\n", len(currentAddrs))
+
 	addAddr, delAddr := diff(newAddrs, currentAddrs)
 	err = AddRoutes(ipVersion, addAddr)
 	if err != nil {

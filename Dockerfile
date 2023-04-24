@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ############# gobuilder
-FROM golang:1.19.5 AS gobuilder
+FROM golang:1.20.3 AS gobuilder
 
 WORKDIR /build
 COPY ./VERSION ./VERSION
@@ -12,11 +12,9 @@ COPY . .
 ARG TARGETARCH
 RUN make build-filter-updater GOARCH=$TARGETARCH
 
-FROM alpine:3.16.3 as builder
+FROM alpine:3.17.3 as builder
 
 WORKDIR /volume
-
-#ADD firewaller/update-firewall.sh ./update-firewall.sh
 
 COPY --from=gobuilder /build/filter-updater ./filter-updater
 
@@ -25,16 +23,9 @@ RUN apk update; \
     apk add ip6tables; \
     apk add iproute2-minimal
 
-RUN mkdir -p ./bin ./sbin ./lib ./usr/bin ./usr/sbin ./usr/lib ./usr/lib/xtables ./usr/lib/bash ./tmp ./run ./etc/bash ./etc/openvpn ./usr/lib/openvpn/plugins ./etc/iproute2 ./etc/terminfo ./etc/logrotate.d ./etc/network/if-up.d ./usr/share/udhcpc \
+RUN mkdir -p ./bin ./sbin ./lib ./usr/bin ./usr/sbin ./usr/lib ./usr/lib/xtables ./tmp ./run ./etc/iproute2\
     && cp -d /lib/ld-musl-* ./lib                                           && echo "package musl" \
     && cp -d /lib/libc.musl-* ./lib                                         && echo "package musl" \
-    && cp -d /bin/busybox ./bin                                             && echo "package busybox" \
-    && cp -d /bin/sh ./bin                                                  && echo "package busybox" \
-    && cp -d /etc/logrotate.d/acpid ./etc/logrotate.d                       && echo "package busybox" \
-    && cp -d /etc/network/if-up.d/dad ./etc/network/if-up.d                 && echo "package busybox" \
-    && cp -d /etc/securetty ./etc                                           && echo "package busybox" \
-    && cp -d /etc/udhcpd.conf ./etc                                         && echo "package busybox" \
-    && cp -d /usr/share/udhcpc/default.script ./usr/share/udhcpc            && echo "package busybox" \
     && cp -d /usr/lib/libcap.* ./usr/lib                                    && echo "package libcap" \
     && cp -d /usr/lib/libpsx.* ./usr/lib                                    && echo "package libcap" \
     && cp -d /usr/lib/libbz2* ./usr/lib                                     && echo "package libbz2" \
