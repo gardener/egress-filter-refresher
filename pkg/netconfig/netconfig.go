@@ -47,6 +47,16 @@ func InitLoggingChain(ipVersion string) error {
 			return errors.New(fmt.Sprintf("Error creating ip%stables logging chain: %v\n", ipVersion, err))
 		}
 	}
+
+	if ipVersion == "6" {
+		if err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, "-t", "mangle", "-C", ipTablesLoggingChain, "-p", "icmpv6", "-j", "DROP"); err != nil {
+			err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, "-t", "mangle", "-A", ipTablesLoggingChain, "-p", "icmpv6", "-j", "DROP")
+			if err != nil {
+				return errors.New(fmt.Sprintf("Error creating ip%stables drop icmp6 rule: %v\n", ipVersion, err))
+			}
+		}
+	}
+
 	if err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, "-t", "mangle", "-C", ipTablesLoggingChain, "-m", "limit", "--limit", ipTablesLogLimit, "-j", "LOG", "--log-prefix", ipTablesLogPrefix, "--log-level", ipTablesLogLevel); err != nil {
 		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, "-t", "mangle", "-A", ipTablesLoggingChain, "-m", "limit", "--limit", ipTablesLogLimit, "-j", "LOG", "--log-prefix", ipTablesLogPrefix, "--log-level", ipTablesLogLevel)
 		if err != nil {
