@@ -22,22 +22,21 @@ const (
 func updateBlackholeRoutes(ipv4EgressFilterList, ipv6EgressFilterList string) {
 	egressFilterContent, err := ioutil.ReadFile(ipv4EgressFilterList)
 	if err != nil {
-		fmt.Printf("Error reading egress filter list: %v\n", err)
+		fmt.Printf("Error reading egress filter list '%s': %v\n", ipv4EgressFilterList, err)
 	}
 	err = netconfig.UpdateRoutes("4", string(egressFilterContent))
 	if err != nil {
-		fmt.Printf("Error: UpdateRoutes failed for: %v\n", err)
+		fmt.Printf("Error: UpdateRoutes failed for IPv4: %v\n", err)
 	}
 
 	egressFilterContent, err = ioutil.ReadFile(ipv6EgressFilterList)
 	if err != nil {
-		fmt.Printf("Error reading egress filter list: %v\n", err)
+		fmt.Printf("Error reading egress filter list '%s': %v\n", ipv6EgressFilterList, err)
 	}
 	err = netconfig.UpdateRoutes("6", string(egressFilterContent))
 	if err != nil {
-		fmt.Printf("Error: Routes failed for %v\n", err)
+		fmt.Printf("Error: UpdateRoutes failed for IPv6: %v\n", err)
 	}
-
 }
 
 func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterList string) {
@@ -57,14 +56,9 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 		defaultNetworkDeviceV6 = defaultNetworkDeviceV4
 	}
 
-	if defaultNetworkDeviceV4 == "" && defaultNetworkDeviceV6 == "" {
-		fmt.Println("Error: No default network device found.")
-		os.Exit(1)
-	}
-
 	egressFilterContent, err := ioutil.ReadFile(ipv4EgressFilterList)
 	if err != nil {
-		fmt.Printf("Error reading egress filter list: %v\n", err)
+		fmt.Printf("Error reading egress filter list '%s': %v\n", ipv4EgressFilterList, err)
 	}
 	err = netconfig.UpdateIPSet("4", ipv4IPSetName, string(egressFilterContent), defaultNetworkDeviceV4, blockIngress)
 	if err != nil {
@@ -73,7 +67,7 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 
 	egressFilterContent, err = ioutil.ReadFile(ipv6EgressFilterList)
 	if err != nil {
-		fmt.Printf("Error reading egress filter list: %v\n", err)
+		fmt.Printf("Error reading egress filter list '%s': %v\n", ipv6EgressFilterList, err)
 	}
 	err = netconfig.UpdateIPSet("6", ipv6IPSetName, string(egressFilterContent), defaultNetworkDeviceV6, blockIngress)
 	if err != nil {
@@ -83,20 +77,15 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 
 func main() {
 	var blackholing, blockIngress bool
-	var filterListDir, ipV4List, ipV6List, sleepDurationStr string
+	var filterListDir, ipV4List, ipV6List string
+	var sleepDuration time.Duration
 	flag.BoolVar(&blackholing, "blackholing", false, "Enable blackhole routes.")
 	flag.BoolVar(&blockIngress, "block-ingress", false, "Block Ingress using iptables.")
 	flag.StringVar(&filterListDir, "filter-list-dir", "/list", "Directory containing the filter list files.")
 	flag.StringVar(&ipV4List, "filter-list-ipv4", "ipv4-list", "ipv4 policy list.")
 	flag.StringVar(&ipV6List, "filter-list-ipv6", "ipv6-list", "ipv6 policy list.")
-	flag.StringVar(&sleepDurationStr, "sleep-duration", "1h", "Sleep time between policy updates.")
+	flag.DurationVar(&sleepDuration, "sleep-duration", time.Hour, "Sleep time between policy updates.")
 	flag.Parse()
-
-	sleepDuration, err := time.ParseDuration(sleepDurationStr)
-	if err != nil {
-		fmt.Printf("Error: Cant parse sleep-duration %s: %v\n", sleepDurationStr, err)
-		os.Exit(1)
-	}
 
 	ipV4List = filterListDir + "/" + ipV4List
 	ipV6List = filterListDir + "/" + ipV6List
@@ -109,7 +98,8 @@ func main() {
 		if blackholing {
 			err := netconfig.InitDummyDevice()
 			if err != nil {
-				fmt.Printf("Error initializing dummy device %v", err)
+				fmt.Printf("Error initializing dummy device: %v", err)
+				os.Exit(1)
 			}
 			fmt.Printf("Updating blackhole routes...")
 			updateBlackholeRoutes(ipV4List, ipV6List)

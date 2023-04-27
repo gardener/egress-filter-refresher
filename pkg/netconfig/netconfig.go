@@ -12,7 +12,7 @@ import (
 
 const (
 	ipSetsMaxLen         = "65536"
-	ipTablesLoggingChain = "LOGGING"
+	ipTablesLoggingChain = "POLICY_LOGGING"
 	ipTablesLogPrefix    = "Policy-Filter-Dropped:"
 	ipTablesLogLimit     = "10/min"
 	ipTablesLogLevel     = "4"
@@ -74,6 +74,7 @@ func InitLoggingChain(ipVersion string) error {
 }
 
 // firewaller
+
 func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, blockIngress bool) error {
 	action := "-A"
 	if check {
@@ -88,7 +89,7 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 		"-m", "set",
 		"--match-set", ipSet,
 		"dst",
-		"-j", "LOGGING",
+		"-j", ipTablesLoggingChain,
 	}
 
 	if protocol == "tcp" {
@@ -101,7 +102,7 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 			"-m", "set",
 			"--match-set", ipSet,
 			"dst",
-			"-j", "LOGGING",
+			"-j", ipTablesLoggingChain,
 		}
 
 		if blockIngress {
@@ -113,7 +114,7 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 				"-m", "set",
 				"--match-set", ipSet,
 				"dst",
-				"-j", "LOGGING",
+				"-j", ipTablesLoggingChain,
 			}
 		}
 	}
@@ -181,7 +182,7 @@ func AddIPListToIPSet(ipSetName string, content string) error {
 	if err != nil {
 		return fmt.Errorf("Error adding addresses to ipset %w\n", err)
 	}
-	fmt.Printf("Added %d entries to ipset %s.\n", len(addrs), ipSetName)
+	fmt.Printf("Added %d entries to ipset '%s'.\n", len(addrs), ipSetName)
 	return nil
 }
 
@@ -218,10 +219,10 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 		return fmt.Errorf("Error adding iptables rules %w\n", err)
 	}
 
-	fmt.Printf("Swapping new ipset %s against old one %s\n", "tmpIPSet", ipSetName)
+	fmt.Printf("Swapping new ipset '%s' against old one '%s'\n", "tmpIPSet", ipSetName)
 	err = DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("swap", "tmpIPSet", ipSetName)
 	if err != nil {
-		return fmt.Errorf("Error swapping ipsets %w\n", err)
+		return fmt.Errorf("Error swapping ipsets: %w\n", err)
 	}
 
 	return nil
@@ -268,19 +269,21 @@ func InitDummyDevice() error {
 			return fmt.Errorf("Error setting up dummy device: %v", err)
 		}
 	}
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING"); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING")
+	fmt.Println("Added dummy device.")
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err != nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
 		if err != nil {
 			return errors.New(fmt.Sprintf("Error creating ip%stables rule for logging packets to dummy device: %v\n", "", err))
 		}
 	}
 
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING"); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", "LOGGING")
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err != nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
 		if err != nil {
 			return errors.New(fmt.Sprintf("Error creating ip%stables rule for logging packets to dummy device: %v\n", "6", err))
 		}
 	}
+	fmt.Println("Created iptables rules for logging packets to dummy device.")
 	return nil
 }
 
