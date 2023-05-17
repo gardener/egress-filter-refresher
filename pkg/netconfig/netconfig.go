@@ -17,6 +17,7 @@ const (
 	ipTablesLogLimit     = "10/min"
 	ipTablesLogLevel     = "4"
 	dummyDeviceName      = "dummy0"
+	tmpIPSet             = "tmpIPSet"
 )
 
 var (
@@ -92,32 +93,10 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 		"-j", ipTablesLoggingChain,
 	}
 
-	if protocol == "tcp" {
-		ipTablesArgs = []string{
-			"-t", "mangle",
-			action, "POSTROUTING",
-			"-o", device,
-			"-p", protocol,
-			"--syn",
-			"-m", "set",
-			"--match-set", ipSet,
-			"dst",
-			"-j", ipTablesLoggingChain,
-		}
-
-		if blockIngress {
-			ipTablesArgs = []string{
-				"-t", "mangle",
-				action, "POSTROUTING",
-				"-o", device,
-				"-p", protocol,
-				"-m", "set",
-				"--match-set", ipSet,
-				"dst",
-				"-j", ipTablesLoggingChain,
-			}
-		}
+	if protocol == "tcp" && !blockIngress {
+		ipTablesArgs = append(ipTablesArgs[:8], append([]string{"--syn"}, ipTablesArgs[8:]...)...)
 	}
+
 	return DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, ipTablesArgs...)
 }
 
@@ -182,7 +161,7 @@ func AddIPListToIPSet(ipSetName string, content string) error {
 	if err != nil {
 		return fmt.Errorf("Error adding addresses to ipset %w\n", err)
 	}
-	fmt.Printf("Added %d entries to ipset '%s'.\n", len(addrs), ipSetName)
+	fmt.Printf("Added %d entries to ipset '%s'.\n", len(addrs)-1, ipSetName)
 	return nil
 }
 
@@ -194,21 +173,21 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 
 	defer func() {
 		fmt.Println("Clean-up")
-		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", "tmpIPSet")
+		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", tmpIPSet)
 		if err != nil {
-			fmt.Printf("Error cleaning-up ipsets %v\n", err)
+			fmt.Printf("Error cleaning-up temporary ipsets %v\n", err)
 		}
 	}()
 
-	fmt.Printf("Creating temporary ipset with name \"%s\"...\n", "tmpIPSet")
-	err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("create", "tmpIPSet", "hash:net", "family", "inet"+inetVersion, "maxelem", ipSetsMaxLen)
+	fmt.Printf("Creating temporary ipset with name \"%s\"...\n", tmpIPSet)
+	err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("create", tmpIPSet, "hash:net", "family", "inet"+inetVersion, "maxelem", ipSetsMaxLen)
 	if err != nil {
 		return fmt.Errorf("Error creating temporary ipset: %w\n", err)
 	}
 
-	fmt.Printf("Temporary ipset with name \"%s\" created successfully.\n", "tmpIPSet")
+	fmt.Printf("Temporary ipset with name \"%s\" created successfully.\n", tmpIPSet)
 
-	err = AddIPListToIPSet("tmpIPSet", egressFilterList)
+	err = AddIPListToIPSet(tmpIPSet, egressFilterList)
 	if err != nil {
 		return fmt.Errorf("Error adding entries to temporary ipset: %w\n", err)
 	}
@@ -219,8 +198,8 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 		return fmt.Errorf("Error adding iptables rules %w\n", err)
 	}
 
-	fmt.Printf("Swapping new ipset '%s' against old one '%s'\n", "tmpIPSet", ipSetName)
-	err = DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("swap", "tmpIPSet", ipSetName)
+	fmt.Printf("Swapping new ipset '%s' against old one '%s'\n", tmpIPSet, ipSetName)
+	err = DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("swap", tmpIPSet, ipSetName)
 	if err != nil {
 		return fmt.Errorf("Error swapping ipsets: %w\n", err)
 	}
@@ -268,8 +247,9 @@ func InitDummyDevice() error {
 		if err != nil {
 			return fmt.Errorf("Error setting up dummy device: %v", err)
 		}
+		fmt.Println("Added dummy device.")
 	}
-	fmt.Println("Added dummy device.")
+
 	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err != nil {
 		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
 		if err != nil {
@@ -314,7 +294,7 @@ func DeleteRoutes(ipVersion string, addrs []string) error {
 	}
 	fmt.Printf("Deleting %d routes.\n", len(addrs))
 	for i, addr := range addrs {
-		addrs[i] = "route del " + addr + " dev dummy0"
+		addrs[i] = "route del " + addr + " dev " + dummyDeviceName
 	}
 	err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteBatchCommand(ipVersion, strings.Join(addrs, "\n"))
 
@@ -331,7 +311,7 @@ func AddRoutes(ipVersion string, addrs []string) error {
 	}
 	fmt.Printf("Adding %d routes.\n", len(addrs))
 	for i, addr := range addrs {
-		addrs[i] = "route add " + addr + " dev dummy0"
+		addrs[i] = "route add " + addr + " dev " + dummyDeviceName
 	}
 	err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteBatchCommand(ipVersion, strings.Join(addrs, "\n"))
 
@@ -351,7 +331,7 @@ func UpdateRoutes(ipVersion string, egressFilterList string) error {
 		return err
 	}
 
-	fmt.Printf("Current filter list contains %d entries\n", len(currentAddrs))
+	fmt.Printf("Currently applied filter list contains %d entries\n", len(currentAddrs))
 
 	addAddr, delAddr := diff(newAddrs, currentAddrs)
 	err = AddRoutes(ipVersion, addAddr)

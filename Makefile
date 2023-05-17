@@ -4,8 +4,8 @@
 
 VERSION                     := $(shell cat VERSION)
 REGISTRY                    := eu.gcr.io/gardener-project/gardener
-PREFIX                      := egress-filter
-IMAGE_REPOSITORY            := $(REGISTRY)/$(PREFIX)
+NAME                        := egress-filter
+IMAGE_REPOSITORY            := $(REGISTRY)/$(NAME)
 IMAGE_TAG                   := $(VERSION)
 EFFECTIVE_VERSION           := $(VERSION)-$(shell git rev-parse HEAD)
 GOARCH                      := amd64
