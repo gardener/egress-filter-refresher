@@ -24,10 +24,9 @@ func updateBlackholeRoutes(ipv4EgressFilterList, ipv6EgressFilterList string) {
 	filterLists := []string{ipv4EgressFilterList, ipv6EgressFilterList}
 
 	for i, v := range []string{"4", "6"} {
-		filterList := filterLists[i]
-		egressFilterContent, err := ioutil.ReadFile(filterList)
+		egressFilterContent, err := ioutil.ReadFile(filterLists[i])
 		if err != nil {
-			fmt.Printf("Error reading egress filter list '%s': %v\n", filterList, err)
+			fmt.Printf("Error reading egress filter list '%s': %v\n", filterLists[i], err)
 		}
 		err = netconfig.UpdateRoutes(v, string(egressFilterContent))
 		if err != nil {
@@ -56,16 +55,14 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 	defaultNetworkDevices := []string{defaultNetworkDeviceV4, defaultNetworkDeviceV6}
 
 	for i, v := range []string{"4", "6"} {
-		ipSetName := ipSetNames[i]
-		filterList := filterLists[i]
-		defaultNetworkDevice := defaultNetworkDevices[i]
-		egressFilterContent, err := ioutil.ReadFile(filterList)
+		netconfig.InitIPSet(v, ipSetNames[i])
+		egressFilterContent, err := ioutil.ReadFile(filterLists[i])
 		if err != nil {
-			fmt.Printf("Error reading egress filter list '%s': %v\n", filterList, err)
+			fmt.Printf("Error reading egress filter list '%s': %v\n", filterLists[i], err)
 		}
-		err = netconfig.UpdateIPSet(v, ipSetName, string(egressFilterContent), defaultNetworkDevice, blockIngress)
+		err = netconfig.UpdateIPSet(v, ipSetNames[i], string(egressFilterContent), defaultNetworkDevices[i], blockIngress)
 		if err != nil {
-			fmt.Printf("Error: UpdateIPSet failed for %s: %v\n", ipSetName, err)
+			fmt.Printf("Error: UpdateIPSet failed for %s: %v\n", ipSetNames[i], err)
 		}
 	}
 }
