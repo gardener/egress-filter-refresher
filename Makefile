@@ -11,7 +11,6 @@ EFFECTIVE_VERSION           := $(VERSION)-$(shell git rev-parse HEAD)
 GOARCH                      := amd64
 REPO_ROOT                   := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-
 .PHONY: revendor
 revendor:
 	@GO111MODULE=on go mod vendor
@@ -28,7 +27,7 @@ test:
 	
 
 .PHONY: format
-format:
+format: install-requirements
 	@$(REPO_ROOT)/hack/format.sh ./cmd ./pkg
 	
 .PHONY: verify
