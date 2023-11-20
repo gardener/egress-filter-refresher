@@ -12,7 +12,7 @@ COPY . .
 ARG TARGETARCH
 RUN make build-filter-updater GOARCH=$TARGETARCH
 
-FROM alpine:3.17.3 as builder
+FROM alpine:3.18.4 as builder
 
 WORKDIR /volume
 
