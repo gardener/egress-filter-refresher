@@ -32,6 +32,7 @@ RUN mkdir -p ./bin ./sbin ./lib ./usr/bin ./usr/sbin ./usr/lib ./usr/lib/xtables
     && cp -d /usr/lib/libfts* ./usr/lib                                     && echo "package fts" \
     && cp -d /usr/lib/liblzma* ./usr/lib                                    && echo "package xz-libs" \
     && cp -d /lib/libz.* ./lib                                              && echo "package zlib" \
+    && cp -d /usr/lib/libzstd.* ./usr/lib                                   && echo "package libzstd" \
     && cp -d /usr/lib/libasm* ./usr/lib                                     && echo "package libelf" \
     && cp -d /usr/lib/libdw* ./usr/lib                                      && echo "package libelf" \
     && cp -d /usr/lib/libelf* ./usr/lib                                     && echo "package libelf" \
