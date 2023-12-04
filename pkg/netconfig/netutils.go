@@ -34,8 +34,19 @@ func (r *OSNetUtilsCommandExecutor) DetermineIPTablesBackend() {
 	if err != nil {
 		return
 	}
-	output := out.String()
-	if !strings.Contains(output, "KUBE-IPTABLES-HINT") && !strings.Contains(output, "KUBE-KUBELET-CANARY") {
+	outputV4 := out.String()
+
+	r.ipTablesBackend = "legacy"
+	cmd = exec.Command("ip6tables-legacy-save")
+
+	cmd.Stdout = &out
+	err = cmd.Run()
+	if err != nil {
+		return
+	}
+	outputV6 := out.String()
+
+	if !strings.Contains(outputV4, "KUBE-IPTABLES-HINT") && !strings.Contains(outputV4, "KUBE-KUBELET-CANARY") && !strings.Contains(outputV6, "KUBE-IPTABLES-HINT") && !strings.Contains(outputV6, "KUBE-KUBELET-CANARY") {
 		r.ipTablesBackend = "nft"
 	}
 }
