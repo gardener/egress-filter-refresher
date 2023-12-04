@@ -7,13 +7,13 @@ package netconfig
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 )
 
 type NetUtilsCommandExecutor interface {
+	DetermineIPTablesBackend()
 	ExecuteIPTablesCommand(ipVersion string, args ...string) error
 	ExecuteIPRouteCommand(ipVersion string, args ...string) (*bytes.Buffer, error)
 	ExecuteIPSetCommand(args ...string) error
@@ -21,7 +21,24 @@ type NetUtilsCommandExecutor interface {
 	ExecuteIPRouteBatchCommand(ipVersion, script string) error
 }
 
-type OSNetUtilsCommandExecutor struct{}
+type OSNetUtilsCommandExecutor struct {
+	ipTablesBackend string
+}
+
+func (r *OSNetUtilsCommandExecutor) DetermineIPTablesBackend() {
+	r.ipTablesBackend = "legacy"
+	cmd := exec.Command("iptables-legacy-save")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return
+	}
+	output := out.String()
+	if !strings.Contains(output, "KUBE-IPTABLES-HINT") && !strings.Contains(output, "KUBE-KUBELET-CANARY") {
+		r.ipTablesBackend = "nft"
+	}
+}
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args ...string) (*bytes.Buffer, error) {
 	args = append([]string{"-" + ipVersion}, args...)
@@ -33,13 +50,13 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, script string) error {
-	tmpFile, err := ioutil.TempFile("", "ip-route-batch")
+	tmpFile, err := os.CreateTemp("", "ip-route-batch")
 	if err != nil {
 		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
-	err = ioutil.WriteFile(tmpFile.Name(), []byte(script), 0644)
+	err = os.WriteFile(tmpFile.Name(), []byte(script), 0644)
 	if err != nil {
 		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
 	}
@@ -53,7 +70,7 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, arg
 		ipVersion = ""
 	}
 	args = append([]string{"-w"}, args...)
-	cmd := exec.Command("ip"+ipVersion+"tables", args...)
+	cmd := exec.Command("ip"+ipVersion+"tables-"+r.ipTablesBackend, args...)
 	return cmd.Run()
 }
 
@@ -72,6 +89,7 @@ type MockNetUtilsCommandExecutor struct {
 	MockCmds           []*exec.Cmd
 	MockIPRoutesStdOut *bytes.Buffer
 	MockCheckError     error
+	ipTablesBackend    string
 }
 
 func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args ...string) (*bytes.Buffer, error) {
@@ -115,4 +133,8 @@ func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, scri
 	cmd.Stdin = strings.NewReader(script)
 	m.MockCmds = append(m.MockCmds, cmd)
 	return nil
+}
+
+func (r *MockNetUtilsCommandExecutor) DetermineIPTablesBackend() {
+	r.ipTablesBackend = "legacy"
 }

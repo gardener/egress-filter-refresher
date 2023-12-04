@@ -41,6 +41,7 @@ func GetDefaultNetworkDevice(ipVersion string) (string, error) {
 }
 
 func InitLoggingChain(ipVersion string) error {
+	DefaultNetUtilsCommandExecutor.DetermineIPTablesBackend()
 	err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, "-t", "mangle", "-L", ipTablesLoggingChain)
 	if err != nil {
 		err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipVersion, "-t", "mangle", "-N", ipTablesLoggingChain)
