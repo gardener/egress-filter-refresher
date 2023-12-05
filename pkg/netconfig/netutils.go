@@ -115,7 +115,7 @@ func (m *MockNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, a
 		ipVersion = ""
 	}
 	args = append([]string{"-w"}, args...)
-	cmd := exec.Command("ip"+ipVersion+"tables", args...)
+	cmd := exec.Command("ip"+ipVersion+"tables-"+m.ipTablesBackend, args...)
 	m.MockCmds = append(m.MockCmds, cmd)
 	if args[3] == "-C" || args[3] == "-L" {
 		return m.MockCheckError
@@ -146,6 +146,6 @@ func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, scri
 	return nil
 }
 
-func (r *MockNetUtilsCommandExecutor) DetermineIPTablesBackend() {
-	r.ipTablesBackend = "legacy"
+func (m *MockNetUtilsCommandExecutor) DetermineIPTablesBackend() {
+	m.ipTablesBackend = "legacy"
 }
