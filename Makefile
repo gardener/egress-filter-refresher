@@ -24,12 +24,12 @@ check:
 .PHONY: test
 test:
 	go test ./...
-	
+
 
 .PHONY: format
 format: install-requirements
 	@$(REPO_ROOT)/hack/format.sh ./cmd ./pkg
-	
+
 .PHONY: verify
 verify: check format test
 
