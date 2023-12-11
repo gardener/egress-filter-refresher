@@ -1,7 +1,5 @@
 egress-filter-refresher:
-  template: 'default'
   base_definition:
-    repo: ~
     traits:
       component_descriptor:
         component_labels:
@@ -19,7 +17,6 @@ egress-filter-refresher:
         - linux/arm64
         dockerimages:
           egress-filter:
-            registry: 'gcr-readwrite'
             image: 'eu.gcr.io/gardener-project/gardener/egress-filter'
             dockerfile: 'Dockerfile'
             resource_labels:
@@ -31,7 +28,6 @@ egress-filter-refresher:
                 confidentiality_requirement: 'high'
                 integrity_requirement: 'high'
                 availability_requirement: 'high'
-    steps: ~
   jobs:
     head-update:
       traits:
