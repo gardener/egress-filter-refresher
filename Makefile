@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 VERSION                     := $(shell cat VERSION)
-REGISTRY                    := eu.gcr.io/gardener-project/gardener
+REGISTRY                    := europe-docker.pkg.dev/gardener-project/public/gardener
 NAME                        := egress-filter
 IMAGE_REPOSITORY            := $(REGISTRY)/$(NAME)
 IMAGE_TAG                   := $(VERSION)
@@ -24,12 +24,12 @@ check:
 .PHONY: test
 test:
 	go test ./...
-	
+
 
 .PHONY: format
 format: install-requirements
 	@$(REPO_ROOT)/hack/format.sh ./cmd ./pkg
-	
+
 .PHONY: verify
 verify: check format test
 

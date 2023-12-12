@@ -1,9 +1,8 @@
 egress-filter-refresher:
-  template: 'default'
   base_definition:
-    repo: ~
     traits:
       component_descriptor:
+        ocm_repository: europe-docker.pkg.dev/gardener-project/snapshots
         component_labels:
         - name: 'cloud.gardener.cnudie/responsibles'
           value:
@@ -19,8 +18,7 @@ egress-filter-refresher:
         - linux/arm64
         dockerimages:
           egress-filter:
-            registry: 'gcr-readwrite'
-            image: 'eu.gcr.io/gardener-project/gardener/egress-filter'
+            image: europe-docker.pkg.dev/gardener-project/snapshots/gardener/egress-filter
             dockerfile: 'Dockerfile'
             resource_labels:
             - name: 'gardener.cloud/cve-categorisation'
@@ -31,11 +29,13 @@ egress-filter-refresher:
                 confidentiality_requirement: 'high'
                 integrity_requirement: 'high'
                 availability_requirement: 'high'
-    steps: ~
   jobs:
     head-update:
       traits:
         draft_release: ~
+        component_descriptor:
+          ocm_repository_mappings:
+            - repository: europe-docker.pkg.dev/gardener-project/snapshots
     pull-request:
       traits:
         pull-request: ~
@@ -43,6 +43,17 @@ egress-filter-refresher:
       traits:
         version:
           preprocess: 'finalize'
+        component_descriptor:
+          ocm_repository: europe-docker.pkg.dev/gardener-project/releases
+          component_name: 'github.com/gardener/egress-filter-refresher'
+          component_labels:
+          - name: 'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1'
+            value:
+              policy: 'skip'
+        publish:
+          dockerimages:
+            egress-filter:
+              image: europe-docker.pkg.dev/gardener-project/releases/gardener/egress-filter
         release:
           nextversion: 'bump_minor'
         slack:
@@ -51,9 +62,3 @@ egress-filter-refresher:
             internal_scp_workspace:
               channel_name: 'C9CEBQPGE' #sap-tech-gardener
               slack_cfg_name: 'scp_workspace'
-        component_descriptor:
-          component_name: 'github.com/gardener/egress-filter-refresher'
-          component_labels:
-          - name: 'cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1'
-            value:
-              policy: 'skip'
