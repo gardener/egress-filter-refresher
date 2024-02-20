@@ -1,1 +1,10 @@
+/bin/
+/hack/tools/bin/
+.idea/
+*.sw[pq]
+.DS_Store
+tmp/
+local/
+.kube/
+.vscode/
 filter-updater

@@ -11,24 +11,25 @@ EFFECTIVE_VERSION           := $(VERSION)-$(shell git rev-parse HEAD)
 GOARCH                      := amd64
 REPO_ROOT                   := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: revendor
-revendor:
-	@GO111MODULE=on go mod vendor
+TOOLS_DIR := hack/tools
+include $(TOOLS_DIR)/tools.mk
+
+.PHONY: tidy
+tidy:
 	@GO111MODULE=on go mod tidy
 
 .PHONY: check
-check:
-	go fmt ./...
+check: $(GOIMPORTS) $(GOLANGCI_LINT)
 	go vet ./...
+	GOIMPORTS=$(GOIMPORTS) GOLANGCI_LINT=$(GOLANGCI_LINT) hack/check.sh ./pkg/...
 
 .PHONY: test
 test:
 	go test ./...
 
-
 .PHONY: format
-format: install-requirements
-	@$(REPO_ROOT)/hack/format.sh ./cmd ./pkg
+format: $(GOIMPORTS)
+	@GOIMPORTS=$(GOIMPORTS) $(REPO_ROOT)/hack/format.sh ./cmd ./pkg
 
 .PHONY: verify
 verify: check format test
@@ -36,14 +37,9 @@ verify: check format test
 .PHONY: build
 build: build-filter-updater
 
-.PHONY: install-requirements
-install-requirements:
-	@go install -mod=vendor $(REPO_ROOT)/vendor/golang.org/x/tools/cmd/goimports
-
 .PHONY: build-filter-updater
 build-filter-updater:
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GO111MODULE=on go build -o filter-updater \
-        -mod=vendor \
 	    -ldflags "-X 'main.Version=$(EFFECTIVE_VERSION)' -X 'main.ImageTag=$(IMAGE_TAG)'"\
 	    ./cmd/main.go
 
