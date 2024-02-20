@@ -26,50 +26,6 @@ License: CC-BY-4.0
 # License:
 
 # --- vendor folder dependencies ---
-Files: vendor/github.com/google/go-cmp/*
-Copyright: 2024 github.com/google/go-cmp contributors.
-License: BSD-3-Clause
-
-Files: vendor/golang.org/x/text/*
-Copyright: 2024 golang.org/x/text contributors.
-License: BSD-3-Clause
-
-Files: vendor/golang.org/x/mod/*
-Copyright: 2024 golang.org/x/mod contributors.
-License: BSD-3-Clause
-
-Files: vendor/golang.org/x/tools/*
-Copyright: 2024 golang.org/x/tools contributors.
-License: BSD-3-Clause
-
-Files: vendor/golang.org/x/net/*
-Copyright: 2024 golang.org/x/net contributors.
-License: BSD-3-Clause
-
-Files: vendor/github.com/google/pprof/*
-Copyright: 2024 github.com/google/pprof contributors.
-License: Apache-2.0
-
-Files: vendor/github.com/go-task/slim-sprig/*
-Copyright: 2024 github.com/go-task/slim-sprig contributors.
-License: MIT
-
-Files: vendor/github.com/onsi/gomega/*
-Copyright: 2024 github.com/onsi/gomega contributors.
-License: MIT
-
-Files: vendor/gopkg.in/yaml.v3/*
-Copyright: 2024 gopkg.in/yaml.v3 contributors.
-License: Apache-2.0
-
-Files: vendor/golang.org/x/sys/*
-Copyright: 2024 golang.org/x/sys contributors.
-License: BSD-3-Clause
-
-Files: vendor/github.com/go-logr/logr/*
-Copyright: 2024 github.com/go-logr/logr contributors.
-License: Apache-2.0
-
-Files: vendor/github.com/onsi/ginkgo/v2/*
-Copyright: 2024 github.com/onsi/ginkgo/v2 contributors.
-License: MIT
+# Files:
+# Copyright:
+# License:
