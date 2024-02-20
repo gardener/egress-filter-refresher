@@ -7,7 +7,7 @@ package netconfig_test
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/gardener/egress-filter-refresher/pkg/netconfig"
@@ -46,7 +46,7 @@ var _ = Describe("Netconfig", func() {
 			device, err := netconfig.GetDefaultNetworkDevice("4")
 			Expect(err).NotTo(BeNil())
 			Expect(device).To(BeEmpty())
-			Expect(err.Error()).To(Equal("default network device not found\n"))
+			Expect(err.Error()).To(Equal("default network device not found"))
 		})
 	})
 
@@ -157,7 +157,7 @@ quit
 			Expect(err).To(BeNil())
 			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "-"}))
-			buf, _ := ioutil.ReadAll(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Stdin)
+			buf, _ := io.ReadAll(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Stdin)
 			Expect(string(buf)).To(Equal(ipSetScript))
 		})
 	})
