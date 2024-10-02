@@ -9,6 +9,7 @@ IMAGE_REPOSITORY            := $(REGISTRY)/$(NAME)
 IMAGE_TAG                   := $(VERSION)
 EFFECTIVE_VERSION           := $(VERSION)-$(shell git rev-parse HEAD)
 GOARCH                      := amd64
+PLATFORM                    := linux/amd64
 REPO_ROOT                   := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 TOOLS_DIR := hack/tools
@@ -53,7 +54,7 @@ build-filter-updater:
 
 .PHONY: docker-images
 docker-images:
-	@docker build -t $(IMAGE_REPOSITORY):$(IMAGE_TAG) -f Dockerfile --rm .
+	@docker build --platform $(PLATFORM) -t $(IMAGE_REPOSITORY):$(IMAGE_TAG) -f Dockerfile --rm .
 
 .PHONY: release
 release: docker-images docker-login docker-push
