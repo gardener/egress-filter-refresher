@@ -268,6 +268,38 @@ func InitDummyDevice() error {
 	return nil
 }
 
+func RemoveDummyDevice() error {
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err == nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-D", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
+		if err != nil {
+			return fmt.Errorf("error deleting ip%stables rule for logging packets to dummy device: %v", "", err)
+		}
+	}
+
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err == nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-D", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
+		if err != nil {
+			return fmt.Errorf("error deleting ip%stables rule for logging packets to dummy device: %v", "6", err)
+		}
+	}
+
+	out, _ := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "show")
+	if strings.Contains(out.String(), " "+dummyDeviceName+": ") {
+		_, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "set", dummyDeviceName, "down")
+		if err != nil {
+			return fmt.Errorf("error bringing down dummy device: %v", err)
+		}
+		_, err = DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "del", dummyDeviceName)
+		if err != nil {
+			return fmt.Errorf("error deleting dummy device: %v", err)
+		}
+		fmt.Println("Removed dummy device.")
+	}
+
+	fmt.Println("Removed iptables rules for logging packets to dummy device.")
+	return nil
+}
+
 func GetBlackholeRoutes(ipVersion string) ([]string, error) {
 	blackholeRoutes := []string{}
 
