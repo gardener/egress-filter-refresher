@@ -54,7 +54,7 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 	defaultNetworkDevices := []string{defaultNetworkDeviceV4, defaultNetworkDeviceV6}
 
 	for i, v := range []string{"4", "6"} {
-		netconfig.InitIPSet(v, ipSetNames[i])
+		_ = netconfig.InitIPSet(v, ipSetNames[i])
 		egressFilterContent, err := os.ReadFile(filterLists[i])
 		if err != nil {
 			return fmt.Errorf("error reading egress filter list '%s': %v", filterLists[i], err)
@@ -85,8 +85,8 @@ func main() {
 	fmt.Printf("blackholing enabled: %v\n", blackholing)
 	for {
 		fmt.Println(time.Now())
-		netconfig.InitLoggingChain("4")
-		netconfig.InitLoggingChain("6")
+		_ = netconfig.InitLoggingChain("4")
+		_ = netconfig.InitLoggingChain("6")
 		if blackholing {
 			err := netconfig.InitDummyDevice()
 			if err != nil {
