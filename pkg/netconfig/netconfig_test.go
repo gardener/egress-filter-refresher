@@ -80,7 +80,7 @@ var _ = Describe("Netconfig", func() {
 
 		DescribeTable("calls the correct command with the correct arguments",
 			func(ipVersion, protocol, ipSet, device string, check bool, expectedArgs []string) {
-				err := netconfig.IPTablesLoggingChainRule(ipVersion, protocol, ipSet, device, check, false)
+				err := netconfig.IPTablesLoggingChainRule(ipVersion, protocol, ipSet, device, check, false, false)
 				Expect(err).To(BeNil())
 				Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal(expectedArgs))
 			},
@@ -229,7 +229,35 @@ line with []
 			Expect(err).To(BeNil())
 			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ip", "-4", "route"}))
+		})
+		It("correct commands are called, when there is no change for ipv6", func() {
+			ipList := `
+			line with []
+			- 2001:16c0:a::/48
+			- 2001:3040::/29
+			- 2001:3b80::
+			- 2001:4188::/29
+			- 2001:4860:7:214::/64
+			- 2401:4900:33d5:4afa:9d59:6c45:239f:8ead/128
+			- 2406:840:9680:666::/64
 
+			`
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			sb := strings.Builder{}
+			sb.WriteString("2001:16c0:a::/48 dev dummy0 scope link \n")
+			sb.WriteString("2001:3040::/29 dev dummy0 scope link \n")
+			sb.WriteString("2001:3b80:: dev dummy0 scope link \n")
+			sb.WriteString("2001:4188::/29 dev dummy0 scope link \n")
+			sb.WriteString("2001:4860:7:214::/64 dev dummy0 scope link \n")
+			sb.WriteString("2401:4900:33d5:4afa:9d59:6c45:239f:8ead dev dummy0 scope link \n")
+			sb.WriteString("2406:840:9680:666::/64 dev dummy0 scope link")
+
+			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString(sb.String())
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			err := netconfig.UpdateRoutes("6", ipList)
+			Expect(err).To(BeNil())
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ip", "-6", "route"}))
 		})
 		It("correct commands are called, when there is no change for ipv6", func() {
 			ipList := `

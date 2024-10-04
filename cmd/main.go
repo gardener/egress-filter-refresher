@@ -85,16 +85,29 @@ func cleanupBlackholeRoutes() error {
 	return err
 }
 
-func cleanupIptables() error {
+func cleanupFirewall() error {
 	fmt.Println("Cleaning up iptables rules...")
-	// TODO:
-	// - clean up iptables filter in mangle table
-	// - keep logging enabled for dummy device
 
-	//ipSetNames := []string{ipv4IPSetName, ipv6IPSetName}
-	//for i, v := range []string{"4", "6"} {
-	//	netconfig.UpdateIPSet(v)
-	//}
+	defaultNetworkDeviceV4, _ := netconfig.GetDefaultNetworkDevice("4")
+	defaultNetworkDeviceV6, _ := netconfig.GetDefaultNetworkDevice("6")
+
+	if defaultNetworkDeviceV4 == "" && defaultNetworkDeviceV6 == "" {
+		return fmt.Errorf("no default network device found")
+	} else if defaultNetworkDeviceV4 == "" {
+		defaultNetworkDeviceV4 = defaultNetworkDeviceV6
+	} else if defaultNetworkDeviceV6 == "" {
+		defaultNetworkDeviceV6 = defaultNetworkDeviceV4
+	}
+
+	ipSetNames := []string{ipv4IPSetName, ipv6IPSetName}
+	defaultNetworkDevices := []string{defaultNetworkDeviceV4, defaultNetworkDeviceV6}
+	for i, v := range []string{"4", "6"} {
+		err := netconfig.RemoveIPSet(v, ipSetNames[i], defaultNetworkDevices[i])
+		if err != nil {
+			return fmt.Errorf("RemoveIPSet failed for %s: %v", ipSetNames[i], err)
+		}
+	}
+
 	return nil
 }
 
@@ -124,13 +137,13 @@ func main() {
 				fmt.Printf("Error initializing dummy device: %v", err)
 				os.Exit(1)
 			}
-			fmt.Printf("Updating blackhole routes...")
+			fmt.Println("Updating blackhole routes...")
 			err = updateBlackholeRoutes(ipV4List, ipV6List)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error updating blackhole routes: %v\n", err)
 				os.Exit(1)
 			}
-			err = cleanupIptables()
+			err = cleanupFirewall()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error cleaning up iptables: %v\n", err)
 				os.Exit(1)

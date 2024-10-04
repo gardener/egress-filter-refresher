@@ -76,10 +76,13 @@ func InitLoggingChain(ipVersion string) error {
 
 // firewaller
 
-func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, blockIngress bool) error {
+func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, delete bool, blockIngress bool) error {
 	action := "-A"
 	if check {
 		action = "-C"
+	}
+	if delete {
+		action = "-D"
 	}
 
 	ipTablesArgs := []string{
@@ -102,16 +105,40 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 
 func AddIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string, blockIngress bool) error {
 
-	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, blockIngress); err != nil {
-		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, blockIngress)
+	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, blockIngress); err != nil {
+		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, false, blockIngress)
 		if err != nil {
 			return fmt.Errorf("error creating tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
 		}
 	}
-	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, blockIngress); err != nil {
-		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, blockIngress)
+	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, false, blockIngress); err != nil {
+		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, false, blockIngress)
 		if err != nil {
 			return fmt.Errorf("error creating udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+		}
+	}
+	return nil
+}
+
+func RemoveIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string) error {
+	// we don't care if SYN filtering was enabled previously. delete both variants.
+	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, true); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, true, true)
+		if err != nil {
+			return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+		}
+	}
+	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, false); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, true, false)
+		if err != nil {
+			return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+		}
+	}
+	// no SYN in udp.
+	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, false, false); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, true, false)
+		if err != nil {
+			return fmt.Errorf("error deleting udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
 		}
 	}
 	return nil
@@ -173,7 +200,7 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 	}
 
 	defer func() {
-		fmt.Println("Clean-up")
+		fmt.Println("Clean-up temporary ipset")
 		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", tmpIPSet)
 		if err != nil {
 			fmt.Printf("Error cleaning-up temporary ipsets %v\n", err)
@@ -206,6 +233,22 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 	}
 
 	return nil
+}
+
+func RemoveIPSet(ipVersion, ipSetName, defaultNetworkDevice string) error {
+	err := RemoveIPTablesLoggingRules(ipVersion, ipSetName, defaultNetworkDevice)
+	if err != nil {
+		return fmt.Errorf("error removing iptables rules %w", err)
+	}
+
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("list", ipSetName); err == nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", ipSetName)
+		if err != nil {
+			return fmt.Errorf("error cleaning-up ipset %s: %w\n", ipSetName, err)
+		}
+	}
+
+	return err
 }
 
 // blackholer
@@ -363,7 +406,6 @@ func UpdateRoutes(ipVersion string, egressFilterList string) error {
 	if err != nil {
 		return err
 	}
-
 	fmt.Printf("Currently applied filter list contains %d entries\n", len(currentAddrs))
 
 	addAddr, delAddr := diff(newAddrs, currentAddrs)
