@@ -63,17 +63,17 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args
 func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, script string) error {
 	tmpFile, err := os.CreateTemp("", "ip-route-batch")
 	if err != nil {
-		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
+		return fmt.Errorf("error creating tmp file for ip route batch processing: %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
 	err = os.WriteFile(tmpFile.Name(), []byte(script), 0600)
 	if err != nil {
-		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
+		return fmt.Errorf("error creating tmp file for ip route batch processing: %v", err)
 	}
 
 	cmd := exec.Command("ip", "-"+ipVersion, "-batch", tmpFile.Name()) // #nosec: G204 -- Almost static command (ip -(4|6) -batch tmpFile) with only the tmpFile being dynamic
-	return cmd.Run()
+	return wrapCmd(cmd)
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, args ...string) error {
@@ -82,18 +82,26 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, arg
 	}
 	args = append([]string{"-w"}, args...)
 	cmd := exec.Command("ip"+ipVersion+"tables-"+r.ipTablesBackend, args...) // #nosec: G204 -- Very limited set of static commands using (ip|ip6)tables-(legacy|nft).
-	return cmd.Run()
+	return wrapCmd(cmd)
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPSetCommand(args ...string) error {
 	cmd := exec.Command("ipset", args...)
-	return cmd.Run()
+	return wrapCmd(cmd)
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPSetScript(script string) error {
 	cmd := exec.Command("ipset", "-")
 	cmd.Stdin = strings.NewReader(script)
-	return cmd.Run()
+	return wrapCmd(cmd)
+}
+
+func wrapCmd(cmd *exec.Cmd) error {
+	outbytes, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, outbytes)
+	}
+	return nil
 }
 
 type MockNetUtilsCommandExecutor struct {
