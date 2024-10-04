@@ -138,8 +138,9 @@ func prepareAddrs(content string, trimSuffix bool) []string {
 		if !strings.Contains(line, "[]") {
 			if len(strings.Fields(line)) == 2 {
 				addr := strings.Fields(line)[1]
-				if trimSuffix && strings.HasSuffix(addr, "/32") {
+				if trimSuffix {
 					addr = strings.TrimSuffix(addr, "/32")
+					addr = strings.TrimSuffix(addr, "/128")
 				}
 				res = append(res, addr)
 			}
