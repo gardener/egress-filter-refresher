@@ -79,18 +79,24 @@ var _ = Describe("Netconfig", func() {
 	Describe("IPTablesLoggingChainRule", func() {
 
 		DescribeTable("calls the correct command with the correct arguments",
-			func(ipVersion, protocol, ipSet, device string, check bool, expectedArgs []string) {
-				err := netconfig.IPTablesLoggingChainRule(ipVersion, protocol, ipSet, device, check, false, false)
+			func(ipVersion, protocol, ipSet, device string, check bool, delete bool, blockIngress bool, expectedArgs []string) {
+				err := netconfig.IPTablesLoggingChainRule(ipVersion, protocol, ipSet, device, check, delete, blockIngress)
 				Expect(err).To(BeNil())
 				Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal(expectedArgs))
 			},
-			Entry("add rule", "", "tcp", "test-ipset", "ens5", false, []string{
+			Entry("add rule", "", "tcp", "test-ipset", "ens5", false, false, false, []string{
 				"iptables-legacy", "-w", "-t", "mangle", "-A", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
-			Entry("check rule", "", "udp", "test-ipset", "ens5", true, []string{
+			Entry("add rule with block-ingress", "", "tcp", "test-ipset", "ens5", false, false, true, []string{
+				"iptables-legacy", "-w", "-t", "mangle", "-A", "POSTROUTING", "-o", "ens5", "-p", "tcp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
+			}),
+			Entry("check rule", "", "udp", "test-ipset", "ens5", true, false, false, []string{
 				"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
-			Entry("add rule with different ip version", "6", "tcp", "test-ipset", "ens5", false, []string{
+			Entry("delete rule", "", "tcp", "test-ipset", "ens5", true, true, false, []string{
+				"iptables-legacy", "-w", "-t", "mangle", "-D", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
+			}),
+			Entry("add rule with different ip version", "6", "tcp", "test-ipset", "ens5", false, false, false, []string{
 				"ip6tables-legacy", "-w", "-t", "mangle", "-A", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
 		)
@@ -98,7 +104,6 @@ var _ = Describe("Netconfig", func() {
 
 	Describe("AddIPTablesLoggingRules", func() {
 		It("makes the right calls to iptables if rules exist", func() {
-
 			err := netconfig.AddIPTablesLoggingRules("4", "test-ipset", "ens5", false)
 			Expect(err).To(BeNil())
 			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(2))
@@ -122,6 +127,32 @@ var _ = Describe("Netconfig", func() {
 
 		})
 	})
+	Describe("RemoveIPTablesLoggingRules", func() {
+		It("makes the right calls to iptables if rules exist", func() {
+			err := netconfig.RemoveIPTablesLoggingRules("4", "test-ipset", "ens5")
+			Expect(err).To(BeNil())
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(6))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "tcp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-D", "POSTROUTING", "-o", "ens5", "-p", "tcp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[3].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-D", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[4].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[5].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-D", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+		})
+		It("makes the right calls to iptables if rules don't exist", func() {
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			mockExecutor.DetermineIPTablesBackend()
+			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024")
+			mockExecutor.MockCheckError = errors.New("iptables: Bad rule (does a matching rule exist in that chain?).")
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			err := netconfig.RemoveIPTablesLoggingRules("4", "test-ipset", "ens5")
+			Expect(err).To(BeNil())
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(3))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "tcp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[2].Args).To(Equal([]string{"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING"}))
+		})
+	})
 	Describe("InitIPSet", func() {
 		It("check if ipset exists and stop if no error", func() {
 			err := netconfig.InitIPSet("4", "test-ipset")
@@ -138,6 +169,24 @@ var _ = Describe("Netconfig", func() {
 			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(2))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "list", "test-ipset"}))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"ipset", "create", "test-ipset", "hash:net", "family", "inet", "maxelem", "65536"}))
+		})
+	})
+	Describe("RemoveIPSet", func() {
+		It("check if ipset exists and stop if error", func() {
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			mockExecutor.MockCheckError = errors.New("ipset v7.11: The set with the given name does not exist")
+			err := netconfig.RemoveIPSet("test-ipset")
+			Expect(err).To(BeNil())
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "list", "test-ipset"}))
+		})
+		It("check if ipset exists and is removed correctly", func() {
+			err := netconfig.RemoveIPSet("test-ipset")
+			Expect(err).To(BeNil())
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(2))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "list", "test-ipset"}))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[1].Args).To(Equal([]string{"ipset", "destroy", "test-ipset"}))
 		})
 	})
 	Describe("AddIPListToIPSet", func() {

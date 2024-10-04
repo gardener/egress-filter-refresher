@@ -141,6 +141,7 @@ func RemoveIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string) e
 			return fmt.Errorf("error deleting udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
 		}
 	}
+	fmt.Printf("Removed iptables v%s rules for ipset %s on device %s\n", ipVersion, ipSet, defaultNetworkDevice)
 	return nil
 }
 
@@ -235,12 +236,7 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 	return nil
 }
 
-func RemoveIPSet(ipVersion, ipSetName, defaultNetworkDevice string) error {
-	err := RemoveIPTablesLoggingRules(ipVersion, ipSetName, defaultNetworkDevice)
-	if err != nil {
-		return fmt.Errorf("error removing iptables rules %w", err)
-	}
-
+func RemoveIPSet(ipSetName string) error {
 	if err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("list", ipSetName); err == nil {
 		err = DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", ipSetName)
 		if err != nil {
@@ -248,7 +244,8 @@ func RemoveIPSet(ipVersion, ipSetName, defaultNetworkDevice string) error {
 		}
 	}
 
-	return err
+	fmt.Printf("Removed ipset %s\n", ipSetName)
+	return nil
 }
 
 // blackholer
