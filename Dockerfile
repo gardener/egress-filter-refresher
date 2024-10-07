@@ -12,7 +12,7 @@ COPY . .
 ARG TARGETARCH
 RUN make build-filter-updater GOARCH=$TARGETARCH
 
-FROM alpine:3.20.3 as builder
+FROM alpine:3.20.3 AS builder
 
 WORKDIR /volume
 
@@ -50,4 +50,4 @@ FROM scratch
 
 COPY --from=builder /volume /
 
-CMD /filter-updater
+CMD ["/filter-updater"]

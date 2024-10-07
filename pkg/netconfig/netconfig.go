@@ -76,10 +76,13 @@ func InitLoggingChain(ipVersion string) error {
 
 // firewaller
 
-func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, blockIngress bool) error {
+func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, delete bool, blockIngress bool) error {
 	action := "-A"
 	if check {
 		action = "-C"
+	}
+	if delete {
+		action = "-D"
 	}
 
 	ipTablesArgs := []string{
@@ -102,18 +105,43 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 
 func AddIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string, blockIngress bool) error {
 
-	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, blockIngress); err != nil {
-		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, blockIngress)
+	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, blockIngress); err != nil {
+		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, false, blockIngress)
 		if err != nil {
 			return fmt.Errorf("error creating tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
 		}
 	}
-	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, blockIngress); err != nil {
-		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, blockIngress)
+	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, false, blockIngress); err != nil {
+		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, false, blockIngress)
 		if err != nil {
 			return fmt.Errorf("error creating udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
 		}
 	}
+	return nil
+}
+
+func RemoveIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string) error {
+	// we don't care if SYN filtering was enabled previously. delete both variants.
+	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, true); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, true, true)
+		if err != nil {
+			return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+		}
+	}
+	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, false); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, true, false)
+		if err != nil {
+			return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+		}
+	}
+	// no SYN in udp.
+	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, false, false); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, true, false)
+		if err != nil {
+			return fmt.Errorf("error deleting udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+		}
+	}
+	fmt.Printf("Removed iptables v%s rules for ipset %s on device %s\n", ipVersion, ipSet, defaultNetworkDevice)
 	return nil
 }
 
@@ -173,7 +201,7 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 	}
 
 	defer func() {
-		fmt.Println("Clean-up")
+		fmt.Println("Clean-up temporary ipset")
 		err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", tmpIPSet)
 		if err != nil {
 			fmt.Printf("Error cleaning-up temporary ipsets %v\n", err)
@@ -205,6 +233,18 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 		return fmt.Errorf("error swapping ipsets: %w", err)
 	}
 
+	return nil
+}
+
+func RemoveIPSet(ipSetName string) error {
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("list", ipSetName); err == nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", ipSetName)
+		if err != nil {
+			return fmt.Errorf("error cleaning-up ipset %s: %w\n", ipSetName, err)
+		}
+	}
+
+	fmt.Printf("Removed ipset %s\n", ipSetName)
 	return nil
 }
 
@@ -265,6 +305,38 @@ func InitDummyDevice() error {
 		}
 	}
 	fmt.Println("Created iptables rules for logging packets to dummy device.")
+	return nil
+}
+
+func RemoveDummyDevice() error {
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err == nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-D", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
+		if err != nil {
+			return fmt.Errorf("error deleting ip%stables rule for logging packets to dummy device: %w", "", err)
+		}
+	}
+
+	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err == nil {
+		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-D", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
+		if err != nil {
+			return fmt.Errorf("error deleting ip%stables rule for logging packets to dummy device: %w", "6", err)
+		}
+	}
+
+	out, _ := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "show")
+	if strings.Contains(out.String(), " "+dummyDeviceName+": ") {
+		_, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "set", dummyDeviceName, "down")
+		if err != nil {
+			return fmt.Errorf("error bringing down dummy device: %w", err)
+		}
+		_, err = DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "del", dummyDeviceName)
+		if err != nil {
+			return fmt.Errorf("error deleting dummy device: %w", err)
+		}
+		fmt.Println("Removed dummy device.")
+	}
+
+	fmt.Println("Removed iptables rules for logging packets to dummy device.")
 	return nil
 }
 
@@ -331,7 +403,6 @@ func UpdateRoutes(ipVersion string, egressFilterList string) error {
 	if err != nil {
 		return err
 	}
-
 	fmt.Printf("Currently applied filter list contains %d entries\n", len(currentAddrs))
 
 	addAddr, delAddr := diff(newAddrs, currentAddrs)
