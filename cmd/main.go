@@ -111,7 +111,7 @@ func cleanupFirewall() error {
 		}
 		err = netconfig.RemoveIPSet(ipSetNames[i])
 		if err != nil {
-			return fmt.Errorf("RemoveIPSet failed for %s: %v", ipSetNames[i], err)
+			return fmt.Errorf("RemoveIPSet failed for %s: %w", ipSetNames[i], err)
 		}
 	}
 
