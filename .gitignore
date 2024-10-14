@@ -8,3 +8,6 @@ local/
 .kube/
 .vscode/
 filter-updater
+
+# gosec
+gosec-report.sarif
