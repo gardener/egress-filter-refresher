@@ -5,7 +5,6 @@
 package netconfig_test
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"strings"
@@ -21,7 +20,7 @@ var _ = Describe("Netconfig", func() {
 	BeforeEach(func() {
 		mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
 		mockExecutor.DetermineIPTablesBackend()
-		mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024")
+		mockExecutor.MockIPRoutesStdOut = "default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024"
 		netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 
 	})
@@ -34,7 +33,7 @@ var _ = Describe("Netconfig", func() {
 	Describe("GetDefaultNetworkDevice", func() {
 		It("returns correct device name", func() {
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024")
+			mockExecutor.MockIPRoutesStdOut = "default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024"
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			device, err := netconfig.GetDefaultNetworkDevice("4")
 			Expect(err).To(BeNil())
@@ -42,7 +41,7 @@ var _ = Describe("Netconfig", func() {
 		})
 		It("returns an error if no device found", func() {
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("Error: any valid prefix is expected rather than \"default\".")
+			mockExecutor.MockIPRoutesStdOut = "Error: any valid prefix is expected rather than \"default\"."
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			device, err := netconfig.GetDefaultNetworkDevice("4")
 			Expect(err).NotTo(BeNil())
@@ -113,7 +112,7 @@ var _ = Describe("Netconfig", func() {
 		It("makes the right calls to iptables if rules don't exist", func() {
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
 			mockExecutor.DetermineIPTablesBackend()
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024")
+			mockExecutor.MockIPRoutesStdOut = "default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024"
 			mockExecutor.MockCheckError = errors.New("iptables: Bad rule (does a matching rule exist in that chain?).")
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 
@@ -142,7 +141,7 @@ var _ = Describe("Netconfig", func() {
 		It("makes the right calls to iptables if rules don't exist", func() {
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
 			mockExecutor.DetermineIPTablesBackend()
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024")
+			mockExecutor.MockIPRoutesStdOut = "default via 10.242.0.1 dev ens5 proto dhcp src 10.242.0.198 metric 1024"
 			mockExecutor.MockCheckError = errors.New("iptables: Bad rule (does a matching rule exist in that chain?).")
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.RemoveIPTablesLoggingRules("4", "test-ipset", "ens5")
@@ -235,7 +234,7 @@ line with []
 
 	Describe("GetBlackholeRoutes", func() {
 		mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
-		mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("1.2.3.4/32 dev dummy0 scope link \n5.2.3.4/30 dev dummy0 scope link")
+		mockExecutor.MockIPRoutesStdOut = "1.2.3.4/32 dev dummy0 scope link \n5.2.3.4/30 dev dummy0 scope link"
 		netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 		blackholeIPs, err := netconfig.GetBlackholeRoutes("4")
 		Expect(err).To(BeNil())
@@ -254,7 +253,7 @@ line with []
 			
 			`
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("1.2.3.4 dev dummy0 scope link \n5.2.3.4/30 dev dummy0 scope link")
+			mockExecutor.MockIPRoutesStdOut = "1.2.3.4 dev dummy0 scope link \n5.2.3.4/30 dev dummy0 scope link"
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.UpdateRoutes("4", ipList)
 			Expect(err).To(BeNil())
@@ -272,7 +271,7 @@ line with []
 			
 			`
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString("1.2.3.4 dev dummy0 scope link \n5.2.3.4/30 dev dummy0 scope link")
+			mockExecutor.MockIPRoutesStdOut = "1.2.3.4 dev dummy0 scope link \n5.2.3.4/30 dev dummy0 scope link"
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.UpdateRoutes("4", ipList)
 			Expect(err).To(BeNil())
@@ -301,7 +300,7 @@ line with []
 			sb.WriteString("2401:4900:33d5:4afa:9d59:6c45:239f:8ead dev dummy0 scope link \n")
 			sb.WriteString("2406:840:9680:666::/64 dev dummy0 scope link")
 
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString(sb.String())
+			mockExecutor.MockIPRoutesStdOut = sb.String()
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.UpdateRoutes("6", ipList)
 			Expect(err).To(BeNil())
@@ -330,7 +329,7 @@ line with []
 			sb.WriteString("2401:4900:33d5:4afa:9d59:6c45:239f:8ead dev dummy0 scope link \n")
 			sb.WriteString("2406:840:9680:666::/64 dev dummy0 scope link")
 
-			mockExecutor.MockIPRoutesStdOut = bytes.NewBufferString(sb.String())
+			mockExecutor.MockIPRoutesStdOut = sb.String()
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.UpdateRoutes("6", ipList)
 			Expect(err).To(BeNil())

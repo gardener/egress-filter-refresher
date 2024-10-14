@@ -24,12 +24,11 @@ var (
 )
 
 func GetDefaultNetworkDevice(ipVersion string) (string, error) {
-	out, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand(ipVersion, "route", "show", "default")
+	output, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand(ipVersion, "route", "show", "default")
 	if err != nil {
 		return "", err
 	}
 
-	output := out.String()
 	fields := strings.Fields(output)
 	for i, field := range fields {
 		if field == "dev" {
@@ -279,7 +278,7 @@ func diff(new, old []string) (added, removed []string) {
 
 func InitDummyDevice() error {
 	out, _ := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "show")
-	if !strings.Contains(out.String(), " "+dummyDeviceName+": ") {
+	if !strings.Contains(out, " "+dummyDeviceName+": ") {
 		_, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "add", dummyDeviceName, "type", "dummy")
 		if err != nil {
 			return fmt.Errorf("error creating dummy device: %v", err)
@@ -324,7 +323,7 @@ func RemoveDummyDevice() error {
 	}
 
 	out, _ := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "show")
-	if strings.Contains(out.String(), " "+dummyDeviceName+": ") {
+	if strings.Contains(out, " "+dummyDeviceName+": ") {
 		_, err := DefaultNetUtilsCommandExecutor.ExecuteIPRouteCommand("4", "link", "set", dummyDeviceName, "down")
 		if err != nil {
 			return fmt.Errorf("error bringing down dummy device: %w", err)
@@ -349,7 +348,7 @@ func GetBlackholeRoutes(ipVersion string) ([]string, error) {
 		return blackholeRoutes, err
 	}
 
-	lines := strings.Split(ipOut.String(), "\n")
+	lines := strings.Split(ipOut, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, dummyDeviceName) && !strings.Contains(line, "fe80::/64") {
 			fields := strings.Fields(line)
