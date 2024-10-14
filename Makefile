@@ -19,9 +19,17 @@ tidy:
 	@GO111MODULE=on go mod tidy
 
 .PHONY: check
-check: $(GOIMPORTS) $(GOLANGCI_LINT)
+check: $(GOIMPORTS) $(GOLANGCI_LINT) sast-report
 	go vet ./...
 	GOIMPORTS=$(GOIMPORTS) GOLANGCI_LINT=$(GOLANGCI_LINT) hack/check.sh ./pkg/...
+
+.PHONY: sast
+sast: $(GOSEC)
+	@./hack/sast.sh
+
+.PHONY: sast-report
+sast-report: $(GOSEC)
+	@./hack/sast.sh --gosec-report true
 
 .PHONY: test
 test:

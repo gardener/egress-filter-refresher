@@ -5,6 +5,9 @@
 TOOLS_BIN_DIR              := $(TOOLS_DIR)/bin
 GOIMPORTS                  := $(TOOLS_BIN_DIR)/goimports
 GOLANGCI_LINT              := $(TOOLS_BIN_DIR)/golangci-lint
+GOSEC                      := $(TOOLS_BIN_DIR)/gosec
+
+export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
 #########################################
 # Common                                #
@@ -34,7 +37,10 @@ clean-tools-bin:
 	rm -rf $(TOOLS_BIN_DIR)/*
 
 # default tool versions
+# renovate: datasource=github-releases depName=golangci/golangci-lint
 GOLANGCI_LINT_VERSION ?= v1.55.1
+# renovate: datasource=github-releases depName=securego/gosec
+GOSEC_VERSION ?= v2.20.0
 
 GOIMPORTS_VERSION ?= $(call version_gomod,golang.org/x/tools)
 
@@ -45,3 +51,6 @@ $(GOLANGCI_LINT): $(call tool_version_file,$(GOLANGCI_LINT),$(GOLANGCI_LINT_VERS
 	@# CGO_ENABLED has to be set to 1 in order for golangci-lint to be able to load plugins
 	@# see https://github.com/golangci/golangci-lint/issues/1276
 	GOBIN=$(abspath $(TOOLS_BIN_DIR)) CGO_ENABLED=1 go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
+$(GOSEC): $(call tool_version_file,$(GOSEC),$(GOSEC_VERSION))
+	@GOSEC_VERSION=$(GOSEC_VERSION) $(TOOLS_DIR)/install-gosec.sh
