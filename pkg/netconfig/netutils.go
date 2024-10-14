@@ -67,7 +67,7 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, script
 	}
 	defer os.Remove(tmpFile.Name())
 
-	err = os.WriteFile(tmpFile.Name(), []byte(script), 0644)
+	err = os.WriteFile(tmpFile.Name(), []byte(script), 0600)
 	if err != nil {
 		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
 	}
