@@ -78,24 +78,24 @@ var _ = Describe("Netconfig", func() {
 	Describe("IPTablesLoggingChainRule", func() {
 
 		DescribeTable("calls the correct command with the correct arguments",
-			func(ipVersion, protocol, ipSet, device string, check bool, delete bool, blockIngress bool, expectedArgs []string) {
-				err := netconfig.IPTablesLoggingChainRule(ipVersion, protocol, ipSet, device, check, delete, blockIngress)
+			func(ipVersion, protocol, ipSet, device string, action netconfig.IPTablesAction, blockIngress bool, expectedArgs []string) {
+				err := netconfig.IPTablesLoggingChainRule(ipVersion, protocol, ipSet, device, action, blockIngress)
 				Expect(err).To(BeNil())
 				Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal(expectedArgs))
 			},
-			Entry("add rule", "", "tcp", "test-ipset", "ens5", false, false, false, []string{
+			Entry("add rule", "", "tcp", "test-ipset", "ens5", netconfig.IPTablesAppend, false, []string{
 				"iptables-legacy", "-w", "-t", "mangle", "-A", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
-			Entry("add rule with block-ingress", "", "tcp", "test-ipset", "ens5", false, false, true, []string{
+			Entry("add rule with block-ingress", "", "tcp", "test-ipset", "ens5", netconfig.IPTablesAppend, true, []string{
 				"iptables-legacy", "-w", "-t", "mangle", "-A", "POSTROUTING", "-o", "ens5", "-p", "tcp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
-			Entry("check rule", "", "udp", "test-ipset", "ens5", true, false, false, []string{
+			Entry("check rule", "", "udp", "test-ipset", "ens5", netconfig.IPTablesCheck, false, []string{
 				"iptables-legacy", "-w", "-t", "mangle", "-C", "POSTROUTING", "-o", "ens5", "-p", "udp", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
-			Entry("delete rule", "", "tcp", "test-ipset", "ens5", true, true, false, []string{
+			Entry("delete rule", "", "tcp", "test-ipset", "ens5", netconfig.IPTablesDelete, false, []string{
 				"iptables-legacy", "-w", "-t", "mangle", "-D", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
-			Entry("add rule with different ip version", "6", "tcp", "test-ipset", "ens5", false, false, false, []string{
+			Entry("add rule with different ip version", "6", "tcp", "test-ipset", "ens5", netconfig.IPTablesAppend, false, []string{
 				"ip6tables-legacy", "-w", "-t", "mangle", "-A", "POSTROUTING", "-o", "ens5", "-p", "tcp", "--syn", "-m", "set", "--match-set", "test-ipset", "dst", "-j", "POLICY_LOGGING",
 			}),
 		)

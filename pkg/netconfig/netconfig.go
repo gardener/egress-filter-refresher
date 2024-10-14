@@ -19,6 +19,14 @@ const (
 	tmpIPSet             = "tmpIPSet"
 )
 
+type IPTablesAction string
+
+const (
+	IPTablesAppend IPTablesAction = "-A"
+	IPTablesCheck  IPTablesAction = "-C"
+	IPTablesDelete IPTablesAction = "-D"
+)
+
 var (
 	DefaultNetUtilsCommandExecutor NetUtilsCommandExecutor = &OSNetUtilsCommandExecutor{}
 )
@@ -75,18 +83,12 @@ func InitLoggingChain(ipVersion string) error {
 
 // firewaller
 
-func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, check bool, delete bool, blockIngress bool) error {
-	action := "-A"
-	if check {
-		action = "-C"
-	}
-	if delete {
-		action = "-D"
-	}
+func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, device string, action IPTablesAction, blockIngress bool) error {
+	a := string(action)
 
 	ipTablesArgs := []string{
 		"-t", "mangle",
-		action, "POSTROUTING",
+		a, "POSTROUTING",
 		"-o", device,
 		"-p", protocol,
 		"-m", "set",
@@ -104,16 +106,12 @@ func IPTablesLoggingChainRule(ipVersion string, protocol string, ipSet string, d
 
 func AddIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string, blockIngress bool) error {
 
-	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, blockIngress); err != nil {
-		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, false, blockIngress)
-		if err != nil {
-			return fmt.Errorf("error creating tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
-		}
-	}
-	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, false, blockIngress); err != nil {
-		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, false, blockIngress)
-		if err != nil {
-			return fmt.Errorf("error creating udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+	for _, proto := range []string{"tcp", "udp"} {
+		if err := IPTablesLoggingChainRule(ipVersion, proto, ipSet, defaultNetworkDevice, IPTablesCheck, blockIngress); err != nil {
+			err := IPTablesLoggingChainRule(ipVersion, proto, ipSet, defaultNetworkDevice, IPTablesAppend, blockIngress)
+			if err != nil {
+				return fmt.Errorf("error creating %s logging chain rules for %s, device %s %w", proto, ipSet, defaultNetworkDevice, err)
+			}
 		}
 	}
 	return nil
@@ -121,23 +119,19 @@ func AddIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string, bloc
 
 func RemoveIPTablesLoggingRules(ipVersion, ipSet, defaultNetworkDevice string) error {
 	// we don't care if SYN filtering was enabled previously. delete both variants.
-	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, true); err == nil {
-		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, true, true)
-		if err != nil {
-			return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+	for _, blockIngress := range []bool{true, false} {
+		if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, IPTablesCheck, blockIngress); err == nil {
+			err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, IPTablesDelete, blockIngress)
+			if err != nil {
+				return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s, blockIngress %t, %w", ipSet, defaultNetworkDevice, blockIngress, err)
+			}
 		}
 	}
-	if err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, true, false, false); err == nil {
-		err := IPTablesLoggingChainRule(ipVersion, "tcp", ipSet, defaultNetworkDevice, false, true, false)
+	// delete udp rules.
+	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, IPTablesCheck, false); err == nil {
+		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, IPTablesDelete, false)
 		if err != nil {
-			return fmt.Errorf("error deleting tcp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
-		}
-	}
-	// no SYN in udp.
-	if err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, true, false, false); err == nil {
-		err := IPTablesLoggingChainRule(ipVersion, "udp", ipSet, defaultNetworkDevice, false, true, false)
-		if err != nil {
-			return fmt.Errorf("error deleting udp logging chain rules for %s, device %s %v", ipSet, defaultNetworkDevice, err)
+			return fmt.Errorf("error deleting udp logging chain rules for %s, device %s %w", ipSet, defaultNetworkDevice, err)
 		}
 	}
 	fmt.Printf("Removed iptables v%s rules for ipset %s on device %s\n", ipVersion, ipSet, defaultNetworkDevice)
@@ -290,19 +284,15 @@ func InitDummyDevice() error {
 		fmt.Println("Added dummy device.")
 	}
 
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("4", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
-		if err != nil {
-			return fmt.Errorf("error creating ip%stables rule for logging packets to dummy device: %v", "", err)
+	for _, ipv := range []string{"4", "6"} {
+		if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipv, "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err != nil {
+			err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand(ipv, "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
+			if err != nil {
+				return fmt.Errorf("error creating ip%stables rule for logging packets to dummy device: %v", "", err)
+			}
 		}
 	}
 
-	if err := DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-C", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain); err != nil {
-		err = DefaultNetUtilsCommandExecutor.ExecuteIPTablesCommand("6", "-t", "mangle", "-A", "POSTROUTING", "-o", dummyDeviceName, "-j", ipTablesLoggingChain)
-		if err != nil {
-			return fmt.Errorf("error creating ip%stables rule for logging packets to dummy device: %v", "6", err)
-		}
-	}
 	fmt.Println("Created iptables rules for logging packets to dummy device.")
 	return nil
 }
