@@ -72,7 +72,7 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, script
 		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
 	}
 
-	cmd := exec.Command("ip", "-"+ipVersion, "-batch", tmpFile.Name())
+	cmd := exec.Command("ip", "-"+ipVersion, "-batch", tmpFile.Name()) // #nosec: G204 -- Almost static command (ip -(4|6) -batch tmpFile) with only the tmpFile being dynamic
 	return cmd.Run()
 }
 
@@ -81,7 +81,7 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, arg
 		ipVersion = ""
 	}
 	args = append([]string{"-w"}, args...)
-	cmd := exec.Command("ip"+ipVersion+"tables-"+r.ipTablesBackend, args...)
+	cmd := exec.Command("ip"+ipVersion+"tables-"+r.ipTablesBackend, args...) // #nosec: G204 -- Very limited set of static commands using (ip|ip6)tables-(legacy|nft).
 	return cmd.Run()
 }
 
@@ -115,7 +115,7 @@ func (m *MockNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, a
 		ipVersion = ""
 	}
 	args = append([]string{"-w"}, args...)
-	cmd := exec.Command("ip"+ipVersion+"tables-"+m.ipTablesBackend, args...)
+	cmd := exec.Command("ip"+ipVersion+"tables-"+m.ipTablesBackend, args...) // #nosec: G204 -- Test only.
 	m.MockCmds = append(m.MockCmds, cmd)
 	if args[3] == "-C" || args[3] == "-L" {
 		return m.MockCheckError
@@ -140,7 +140,7 @@ func (m *MockNetUtilsCommandExecutor) ExecuteIPSetScript(script string) error {
 }
 
 func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, script string) error {
-	cmd := exec.Command("ip", "-"+ipVersion, "-batch", "tmpFile")
+	cmd := exec.Command("ip", "-"+ipVersion, "-batch", "tmpFile") // #nosec: G204 -- Test only.
 	cmd.Stdin = strings.NewReader(script)
 	m.MockCmds = append(m.MockCmds, cmd)
 	return nil
