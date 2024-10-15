@@ -243,6 +243,40 @@ line with []
 		Expect(blackholeIPs[1]).To(Equal("5.2.3.4/30"))
 	})
 
+	Describe("InitDummyDevice", func() {
+		It("does not fail if dummy0 already exists", func() {
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			mockExecutor.MockIPRoutesStdOut = "36: dummy0: <BROADCAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000 link/ether e2:90:98:7e:4d:32 brd ff:ff:ff:ff:ff:ff"
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			err := netconfig.InitDummyDevice()
+			Expect(err).To(BeNil())
+		})
+		It("does not fail if dummy0 does not exist", func() {
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			mockExecutor.MockIPRoutesStdOut = "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000 link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00"
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			err := netconfig.InitDummyDevice()
+			Expect(err).To(BeNil())
+		})
+	})
+
+	Describe("RemoveDummyDevice", func() {
+		It("does not fail if dummy0 already exists", func() {
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			mockExecutor.MockIPRoutesStdOut = "36: dummy0: <BROADCAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000 link/ether e2:90:98:7e:4d:32 brd ff:ff:ff:ff:ff:ff"
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			err := netconfig.RemoveDummyDevice()
+			Expect(err).To(BeNil())
+		})
+		It("does not fail if dummy0 does not exist", func() {
+			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
+			mockExecutor.MockIPRoutesStdOut = "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000 link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00"
+			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
+			err := netconfig.RemoveDummyDevice()
+			Expect(err).To(BeNil())
+		})
+	})
+
 	Describe("UpdateRoutes", func() {
 		It("correct commands are called", func() {
 			ipList := `
