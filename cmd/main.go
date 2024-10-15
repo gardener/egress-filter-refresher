@@ -54,7 +54,10 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 	defaultNetworkDevices := []string{defaultNetworkDeviceV4, defaultNetworkDeviceV6}
 
 	for i, v := range []string{"4", "6"} {
-		_ = netconfig.InitIPSet(v, ipSetNames[i])
+		err := netconfig.InitIPSet(v, ipSetNames[i])
+		if err != nil {
+			return fmt.Errorf("UpdateIPSet failed for %s: %v", ipSetNames[i], err)
+		}
 		egressFilterContent, err := os.ReadFile(filterLists[i])
 		if err != nil {
 			return fmt.Errorf("error reading egress filter list '%s': %v", filterLists[i], err)
@@ -64,6 +67,54 @@ func updateFirewall(blockIngress bool, ipv4EgressFilterList, ipv6EgressFilterLis
 			return fmt.Errorf("UpdateIPSet failed for %s: %v", ipSetNames[i], err)
 		}
 	}
+	return nil
+}
+
+func cleanupBlackholeRoutes() error {
+	fmt.Println("Cleaning up blackhole routes...")
+	for _, v := range []string{"4", "6"} {
+		routes, err := netconfig.GetBlackholeRoutes(v)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("cleaning up %d ipv%s routes\n", len(routes), v)
+		err = netconfig.DeleteRoutes(v, routes)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := netconfig.RemoveDummyDevice()
+	return err
+}
+
+func cleanupFirewall() error {
+	fmt.Println("Cleaning up iptables rules...")
+
+	defaultNetworkDeviceV4, _ := netconfig.GetDefaultNetworkDevice("4")
+	defaultNetworkDeviceV6, _ := netconfig.GetDefaultNetworkDevice("6")
+
+	if defaultNetworkDeviceV4 == "" && defaultNetworkDeviceV6 == "" {
+		return fmt.Errorf("no default network device found")
+	} else if defaultNetworkDeviceV4 == "" {
+		defaultNetworkDeviceV4 = defaultNetworkDeviceV6
+	} else if defaultNetworkDeviceV6 == "" {
+		defaultNetworkDeviceV6 = defaultNetworkDeviceV4
+	}
+
+	ipSetNames := []string{ipv4IPSetName, ipv6IPSetName}
+	defaultNetworkDevices := []string{defaultNetworkDeviceV4, defaultNetworkDeviceV6}
+	for i, v := range []string{"4", "6"} {
+		err := netconfig.RemoveIPTablesLoggingRules(v, ipSetNames[i], defaultNetworkDevices[i])
+		if err != nil {
+			return fmt.Errorf("RemoveIPTablesLoggingRules failed for %s: %v", ipSetNames[i], err)
+		}
+		err = netconfig.RemoveIPSet(ipSetNames[i])
+		if err != nil {
+			return fmt.Errorf("RemoveIPSet failed for %s: %w", ipSetNames[i], err)
+		}
+	}
+
 	return nil
 }
 
@@ -85,18 +136,31 @@ func main() {
 	fmt.Printf("blackholing enabled: %v\n", blackholing)
 	for {
 		fmt.Println(time.Now())
-		_ = netconfig.InitLoggingChain("4")
-		_ = netconfig.InitLoggingChain("6")
+		err := netconfig.InitLoggingChain("4")
+		if err != nil {
+			fmt.Printf("Error initializing ipv4 logging chain: %v\n", err)
+			os.Exit(1)
+		}
+		err = netconfig.InitLoggingChain("6")
+		if err != nil {
+			fmt.Printf("Error initializing ipv6 logging chain: %v\n", err)
+			os.Exit(1)
+		}
 		if blackholing {
 			err := netconfig.InitDummyDevice()
 			if err != nil {
 				fmt.Printf("Error initializing dummy device: %v", err)
 				os.Exit(1)
 			}
-			fmt.Printf("Updating blackhole routes...")
+			fmt.Println("Updating blackhole routes...")
 			err = updateBlackholeRoutes(ipV4List, ipV6List)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error updating blackhole routes: %v\n", err)
+				os.Exit(1)
+			}
+			err = cleanupFirewall()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error cleaning up iptables: %v\n", err)
 				os.Exit(1)
 			}
 		} else {
@@ -104,6 +168,11 @@ func main() {
 			err := updateFirewall(blockIngress, ipV4List, ipV6List)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error updating iptables: %v\n", err)
+				os.Exit(1)
+			}
+			err = cleanupBlackholeRoutes()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error cleaning up blackhole routes: %v\n", err)
 				os.Exit(1)
 			}
 		}

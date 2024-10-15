@@ -7,6 +7,7 @@ package netconfig
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -15,7 +16,7 @@ import (
 type NetUtilsCommandExecutor interface {
 	DetermineIPTablesBackend()
 	ExecuteIPTablesCommand(ipVersion string, args ...string) error
-	ExecuteIPRouteCommand(ipVersion string, args ...string) (*bytes.Buffer, error)
+	ExecuteIPRouteCommand(ipVersion string, args ...string) (string, error)
 	ExecuteIPSetCommand(args ...string) error
 	ExecuteIPSetScript(ipSetScript string) error
 	ExecuteIPRouteBatchCommand(ipVersion, script string) error
@@ -51,29 +52,26 @@ func (r *OSNetUtilsCommandExecutor) DetermineIPTablesBackend() {
 	}
 }
 
-func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args ...string) (*bytes.Buffer, error) {
+func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args ...string) (string, error) {
 	args = append([]string{"-" + ipVersion}, args...)
-	cmd := exec.Command("ip", args...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	return &out, err
+	out, err := wrapCmd("ip", args...)
+	return out, err
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPRouteBatchCommand(ipVersion, script string) error {
 	tmpFile, err := os.CreateTemp("", "ip-route-batch")
 	if err != nil {
-		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
+		return fmt.Errorf("error creating tmp file for ip route batch processing: %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
 	err = os.WriteFile(tmpFile.Name(), []byte(script), 0600)
 	if err != nil {
-		return fmt.Errorf("Error creating tmp file for ip route batch processing: %v", err)
+		return fmt.Errorf("error creating tmp file for ip route batch processing: %v", err)
 	}
 
-	cmd := exec.Command("ip", "-"+ipVersion, "-batch", tmpFile.Name()) // #nosec: G204 -- Almost static command (ip -(4|6) -batch tmpFile) with only the tmpFile being dynamic
-	return cmd.Run()
+	_, err = wrapCmd("ip", "-"+ipVersion, "-batch", tmpFile.Name())
+	return err
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, args ...string) error {
@@ -81,29 +79,49 @@ func (r *OSNetUtilsCommandExecutor) ExecuteIPTablesCommand(ipVersion string, arg
 		ipVersion = ""
 	}
 	args = append([]string{"-w"}, args...)
-	cmd := exec.Command("ip"+ipVersion+"tables-"+r.ipTablesBackend, args...) // #nosec: G204 -- Very limited set of static commands using (ip|ip6)tables-(legacy|nft).
-	return cmd.Run()
+	_, err := wrapCmd("ip"+ipVersion+"tables-"+r.ipTablesBackend, args...)
+	return err
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPSetCommand(args ...string) error {
-	cmd := exec.Command("ipset", args...)
-	return cmd.Run()
+	_, err := wrapCmd("ipset", args...)
+	return err
 }
 
 func (r *OSNetUtilsCommandExecutor) ExecuteIPSetScript(script string) error {
-	cmd := exec.Command("ipset", "-")
-	cmd.Stdin = strings.NewReader(script)
-	return cmd.Run()
+	_, err := wrapCmdStdin("ipset", strings.NewReader(script), "-")
+	return err
+}
+
+func wrapCmd(name string, arg ...string) (string, error) {
+	return wrapCmdStdin(name, nil, arg...)
+}
+
+func wrapCmdStdin(name string, stdIn io.Reader, arg ...string) (string, error) {
+	cmd := exec.Command(name, arg...)
+	var stdOut, stdErr bytes.Buffer
+	cmd.Stdout = &stdOut
+	cmd.Stderr = &stdErr
+	if stdIn != nil {
+		cmd.Stdin = stdIn
+	}
+	err := cmd.Run()
+
+	if err != nil {
+		return "", fmt.Errorf("%w: stdout: %s  stderr: %s", err, stdOut.String(), stdErr.String())
+	}
+
+	return stdOut.String(), nil
 }
 
 type MockNetUtilsCommandExecutor struct {
 	MockCmds           []*exec.Cmd
-	MockIPRoutesStdOut *bytes.Buffer
+	MockIPRoutesStdOut string
 	MockCheckError     error
 	ipTablesBackend    string
 }
 
-func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args ...string) (*bytes.Buffer, error) {
+func (m *MockNetUtilsCommandExecutor) ExecuteIPRouteCommand(ipVersion string, args ...string) (string, error) {
 	args = append([]string{"-" + ipVersion}, args...)
 	cmd := exec.Command("ip", args...)
 	m.MockCmds = append(m.MockCmds, cmd)
