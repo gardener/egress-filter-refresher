@@ -1,5 +1,15 @@
 egress-filter-refresher:
   base_definition:
+    repo:
+      source_labels:
+      - name: cloud.gardener.cnudie/dso/scanning-hints/source_analysis/v1
+        value:
+          policy: skip
+          comment: |
+            we use gosec for sast scanning. See attached log.
+    steps:
+      verify:
+        image: 'golang:1.23.2'
     traits:
       component_descriptor:
         ocm_repository: europe-docker.pkg.dev/gardener-project/snapshots
@@ -56,6 +66,17 @@ egress-filter-refresher:
               image: europe-docker.pkg.dev/gardener-project/releases/gardener/egress-filter
         release:
           nextversion: 'bump_minor'
+          assets:
+          - type: build-step-log
+            step_name: verify
+            purposes:
+            - lint
+            - sast
+            - gosec
+            comment: |
+                we use gosec (linter) for SAST scans
+                see: https://github.com/securego/gosec
+                enabled by https://github.com/gardener/egress-filter-refresher/pull/50
         slack:
           default_channel: 'internal_scp_workspace'
           channel_cfgs:
