@@ -29,7 +29,7 @@ RUN mkdir -p ./bin ./sbin ./lib ./usr/bin ./usr/sbin ./usr/lib ./usr/lib/xtables
     && cp -d /lib/libc.musl-* ./lib                                         && echo "package musl" \
     && cp -d /usr/lib/libcap.* ./usr/lib                                    && echo "package libcap" \
     && cp -d /usr/lib/libpsx.* ./usr/lib                                    && echo "package libcap" \
-    && cp -d /lib/libz.* ./lib                                              && echo "package zlib" \
+    && cp -d /usr/lib/libz.* ./lib                                              && echo "package zlib" \
     && cp -d /usr/lib/libzstd.* ./usr/lib                                   && echo "package libzstd" \
     && cp -d /usr/lib/libelf* ./usr/lib                                     && echo "package libelf" \
     && cp -d /usr/lib/libmnl.* ./usr/lib                                    && echo "package libmnl" \
@@ -38,13 +38,13 @@ RUN mkdir -p ./bin ./sbin ./lib ./usr/bin ./usr/sbin ./usr/lib ./usr/lib/xtables
     && cp -d /usr/sbin/ipset* ./usr/sbin                                    && echo "package ipset" \
     && cp -d /usr/lib/libnftnl* ./usr/lib                                   && echo "package libnftnl" \
     && cp -d /etc/ethertypes ./etc                                          && echo "package iptables" \
-    && cp -d /sbin/iptables* ./sbin                                         && echo "package iptables" \
-    && cp -d /sbin/xtables* ./sbin                                          && echo "package iptables" \
+    && cp -d /usr/sbin/iptables* ./sbin                                         && echo "package iptables" \
+    && cp -d /usr/sbin/xtables* ./sbin                                          && echo "package iptables" \
     && cp -d /usr/lib/libip4* ./usr/lib                                     && echo "package iptables" \
     && cp -d /usr/lib/libip6* ./usr/lib                                     && echo "package iptables" \
     && cp -d /usr/lib/libxtables* ./usr/lib                                 && echo "package iptables" \
     && cp -d /usr/lib/xtables/* ./usr/lib/xtables                           && echo "package iptables" \
-    && cp -d /sbin/ip6tables* ./sbin                                        && echo "package ip6tables"
+    && cp -d /usr/sbin/ip6tables* ./sbin                                        && echo "package ip6tables"
 
 FROM scratch
 
