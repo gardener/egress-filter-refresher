@@ -1,0 +1,15 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+aliases:
+  egress-filter-refresher-reviewers:
+  - axel7born
+  - DockToFuture
+  - domdom82
+  - marwinski
+  - ScheererJ
+  egress-filter-refresher-approvers:
+  - axel7born
+  - DockToFuture
+  - domdom82
+  - marwinski
+  - ScheererJ
