@@ -6,6 +6,7 @@ package netconfig_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -202,12 +203,36 @@ line with []
 -A test-ipset 9.8.7.16/28
 quit
 `
-			err := netconfig.AddIPListToIPSet("test-ipset", ipList)
+			err := netconfig.AddIPListToIPSet("4", "test-ipset", ipList)
 			Expect(err).To(BeNil())
 			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "-"}))
 			buf, _ := io.ReadAll(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Stdin)
 			Expect(string(buf)).To(Equal(ipSetScript))
+		})
+		It("Adds NAT64 entries for IPv4 addresses when ipVersion is 6", func() {
+			ipList := `
+line with []
+- 1.2.3.4/32
+- 5.6.7.0/24
+- 9.8.7.16/28
+`
+			expectedScript := `-A test-ipset 64:ff9b::1.2.3.4/128
+-A test-ipset 64:ff9b::5.6.7.0/120
+-A test-ipset 64:ff9b::9.8.7.16/124
+quit
+`
+			err := netconfig.AddIPListToIPSet("6", "test-ipset", ipList)
+			Expect(err).To(BeNil())
+			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
+			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ipset", "-"}))
+			buf, _ := io.ReadAll(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Stdin)
+			fmt.Println("---")
+			fmt.Println(string(buf))
+			fmt.Println("---")
+			fmt.Println(expectedScript)
+			fmt.Println("---")
+			Expect(string(buf)).To(Equal(expectedScript))
 		})
 	})
 
@@ -348,9 +373,9 @@ line with []
 			- 2001:3040::/29
 			- 2001:3b80::
 			- 2001:4188::/29
-			- 2001:4860:7:214::/64
-			- 2401:4900:33d5:4afa:9d59:6c45:239f:8ead/128
-			- 2406:840:9680:666::/64
+			- 1.2.3.4/32
+			- 5.6.7.0/24
+			- 9.8.7.16/28
 
 			`
 			mockExecutor := &netconfig.MockNetUtilsCommandExecutor{}
@@ -359,18 +384,22 @@ line with []
 			sb.WriteString("2001:3040::/29 dev dummy0 scope link \n")
 			sb.WriteString("2001:3b80:: dev dummy0 scope link \n")
 			sb.WriteString("2001:4188::/29 dev dummy0 scope link \n")
-			sb.WriteString("2001:4860:7:214::/64 dev dummy0 scope link \n")
-			sb.WriteString("2401:4900:33d5:4afa:9d59:6c45:239f:8ead dev dummy0 scope link \n")
-			sb.WriteString("2406:840:9680:666::/64 dev dummy0 scope link")
+			sb.WriteString("64:ff9b::1.2.3.4/128 dev dummy0 scope link \n")
+			sb.WriteString("64:ff9b::5.6.7.0/120 dev dummy0 scope link \n")
+			sb.WriteString("64:ff9b::9.8.7.16/124 dev dummy0 scope link")
 
 			mockExecutor.MockIPRoutesStdOut = sb.String()
 			netconfig.DefaultNetUtilsCommandExecutor = mockExecutor
 			err := netconfig.UpdateRoutes("6", ipList)
 			Expect(err).To(BeNil())
+			for i, cmd := range netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds {
+				fmt.Printf("Cmd %d: %v\n", i, cmd.Args)
+			}
+
 			Expect(len(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds)).To(Equal(1))
 			Expect(netconfig.DefaultNetUtilsCommandExecutor.(*netconfig.MockNetUtilsCommandExecutor).MockCmds[0].Args).To(Equal([]string{"ip", "-6", "route"}))
-		})
 
+		})
 	})
 })
 
