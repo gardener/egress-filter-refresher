@@ -175,27 +175,40 @@ func prepareAddrs(ipVersion string, content string, trimSuffix bool) []string {
 	if ipVersion == "6" {
 		for i, addr := range res {
 			// Parse CIDR or host
-			var ip net.IP
+			var ipv4 net.IP
 			var maskLen int
 			if strings.Contains(addr, "/") {
 				parsedIP, parsedNet, err := net.ParseCIDR(addr)
 				if err == nil && parsedIP.To4() != nil {
-					ip = parsedIP
+					ipv4 = parsedIP.To4()
 					maskLen, _ = parsedNet.Mask.Size()
 				} else {
 					continue
 				}
 			}
-			if ip == nil {
+			if ipv4 == nil {
 				parsedIP := net.ParseIP(addr)
 				if parsedIP == nil || parsedIP.To4() == nil {
 					continue
 				}
-				ip = parsedIP
+				ipv4 = parsedIP.To4()
 				maskLen = 32
 			}
+
+			// Construct NAT64 IPv6 address: 64:ff9b::/96 + IPv4 bytes
+			// Well-known prefix 64:ff9b:: = 0064:ff9b:0000:0000:0000:0000:xxxx:xxxx
+			ipv6Bytes := make([]byte, 16)
+			ipv6Bytes[0] = 0x00
+			ipv6Bytes[1] = 0x64
+			ipv6Bytes[2] = 0xff
+			ipv6Bytes[3] = 0x9b
+			// bytes 4-11 are zero (already set by make)
+			// Copy IPv4 bytes to the last 4 bytes (positions 12-15)
+			copy(ipv6Bytes[12:], ipv4)
+
 			ipv6MaskLen := 96 + maskLen
-			res[i] = fmt.Sprintf("64:ff9b::%s/%d", ip.String(), ipv6MaskLen)
+			ipv6Addr := net.IP(ipv6Bytes)
+			res[i] = fmt.Sprintf("%s/%d", ipv6Addr.String(), ipv6MaskLen)
 		}
 	}
 	return res
