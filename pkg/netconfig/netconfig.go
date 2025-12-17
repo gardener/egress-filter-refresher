@@ -6,6 +6,7 @@ package netconfig
 
 import (
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -154,7 +155,7 @@ func InitIPSet(ipVersion, ipSetName string) error {
 	return nil
 }
 
-func prepareAddrs(content string, trimSuffix bool) []string {
+func prepareAddrs(ipVersion string, content string, trimSuffix bool) []string {
 	res := []string{}
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
@@ -169,12 +170,53 @@ func prepareAddrs(content string, trimSuffix bool) []string {
 			}
 		}
 	}
+
+	// Inject NAT64 mapped IPv6 prefixes for IPv4 entries when requested and ipVersion==6.
+	if ipVersion == "6" {
+		for i, addr := range res {
+			// Parse CIDR or host
+			var ipv4 net.IP
+			var maskLen int
+			if strings.Contains(addr, "/") {
+				parsedIP, parsedNet, err := net.ParseCIDR(addr)
+				if err == nil && parsedIP.To4() != nil {
+					ipv4 = parsedIP.To4()
+					maskLen, _ = parsedNet.Mask.Size()
+				} else {
+					continue
+				}
+			}
+			if ipv4 == nil {
+				parsedIP := net.ParseIP(addr)
+				if parsedIP == nil || parsedIP.To4() == nil {
+					continue
+				}
+				ipv4 = parsedIP.To4()
+				maskLen = 32
+			}
+
+			// Construct NAT64 IPv6 address: 64:ff9b::/96 + IPv4 bytes
+			// Well-known prefix 64:ff9b:: = 0064:ff9b:0000:0000:0000:0000:xxxx:xxxx
+			ipv6Bytes := make([]byte, 16)
+			ipv6Bytes[0] = 0x00
+			ipv6Bytes[1] = 0x64
+			ipv6Bytes[2] = 0xff
+			ipv6Bytes[3] = 0x9b
+			// bytes 4-11 are zero (already set by make)
+			// Copy IPv4 bytes to the last 4 bytes (positions 12-15)
+			copy(ipv6Bytes[12:], ipv4)
+
+			ipv6MaskLen := 96 + maskLen
+			ipv6Addr := net.IP(ipv6Bytes)
+			res[i] = fmt.Sprintf("%s/%d", ipv6Addr.String(), ipv6MaskLen)
+		}
+	}
 	return res
 }
 
-func AddIPListToIPSet(ipSetName string, content string) error {
+func AddIPListToIPSet(ipVersion, ipSetName string, content string) error {
 
-	addrs := prepareAddrs(content, false)
+	addrs := prepareAddrs(ipVersion, content, false)
 
 	for i, addr := range addrs {
 		addrs[i] = "-A " + ipSetName + " " + addr
@@ -185,7 +227,9 @@ func AddIPListToIPSet(ipSetName string, content string) error {
 	if err != nil {
 		return fmt.Errorf("error adding addresses to ipset %w", err)
 	}
-	fmt.Printf("Added %d entries to ipset '%s'.\n", len(addrs)-1, ipSetName)
+	addedTotal := len(addrs) - 1
+	fmt.Printf("Added %d entries to ipset '%s'.\n", addedTotal, ipSetName)
+
 	return nil
 }
 
@@ -211,7 +255,7 @@ func UpdateIPSet(ipVersion, ipSetName, egressFilterList, defaultNetworkDevice st
 
 	fmt.Printf("Temporary ipset with name \"%s\" created successfully.\n", tmpIPSet)
 
-	err = AddIPListToIPSet(tmpIPSet, egressFilterList)
+	err = AddIPListToIPSet(ipVersion, tmpIPSet, egressFilterList)
 	if err != nil {
 		return fmt.Errorf("error adding entries to temporary ipset: %w", err)
 	}
@@ -236,7 +280,7 @@ func RemoveIPSet(ipSetName string) error {
 		return nil
 	}
 	if err := DefaultNetUtilsCommandExecutor.ExecuteIPSetCommand("destroy", ipSetName); err != nil {
-		return fmt.Errorf("error cleaning-up ipset %s: %w\n", ipSetName, err)
+		return fmt.Errorf("error cleaning-up ipset %s: %w", ipSetName, err)
 	}
 
 	fmt.Printf("Removed ipset %s\n", ipSetName)
@@ -381,7 +425,7 @@ func AddRoutes(ipVersion string, addrs []string) error {
 }
 
 func UpdateRoutes(ipVersion string, egressFilterList string) error {
-	newAddrs := prepareAddrs(egressFilterList, true)
+	newAddrs := prepareAddrs(ipVersion, egressFilterList, true)
 	fmt.Printf("Checking ipv%s egress filter list with %d entries against current settings...\n", ipVersion, len(newAddrs))
 
 	currentAddrs, err := GetBlackholeRoutes(ipVersion)
