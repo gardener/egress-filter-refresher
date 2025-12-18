@@ -208,7 +208,12 @@ func prepareAddrs(ipVersion string, content string, trimSuffix bool) []string {
 
 			ipv6MaskLen := 96 + maskLen
 			ipv6Addr := net.IP(ipv6Bytes)
-			res[i] = fmt.Sprintf("%s/%d", ipv6Addr.String(), ipv6MaskLen)
+
+			if trimSuffix && ipv6MaskLen == 128 {
+				res[i] = ipv6Addr.String()
+			} else {
+				res[i] = fmt.Sprintf("%s/%d", ipv6Addr.String(), ipv6MaskLen)
+			}
 		}
 	}
 	return res

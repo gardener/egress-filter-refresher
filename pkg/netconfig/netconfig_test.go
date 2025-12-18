@@ -378,7 +378,7 @@ line with []
 			sb.WriteString("2001:3040::/29 dev dummy0 scope link \n")
 			sb.WriteString("2001:3b80:: dev dummy0 scope link \n")
 			sb.WriteString("2001:4188::/29 dev dummy0 scope link \n")
-			sb.WriteString("64:ff9b::102:304/128 dev dummy0 scope link \n")
+			sb.WriteString("64:ff9b::102:304 dev dummy0 scope link \n")
 			sb.WriteString("64:ff9b::506:700/120 dev dummy0 scope link \n")
 			sb.WriteString("64:ff9b::908:710/124 dev dummy0 scope link")
 
