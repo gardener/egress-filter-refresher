@@ -23,6 +23,7 @@
       "matchPackagePatterns": [
         "^actions/checkout$",
         "^actions/setup-go$",
+        "^actions/go-versions$",
       ],
       "automerge": true
     },
