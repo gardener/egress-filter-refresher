@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
+          go-version: '1.26'
       - uses: gardener/cc-utils/.github/actions/trusted-checkout@v1
       - name: run-verify
         run: |
