@@ -19,7 +19,7 @@
     },
     {
       "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["patch", "digest"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true
     },
     {
@@ -29,7 +29,7 @@
         "^actions/setup-go$",
         "^actions/go-versions$",
       ],
-      "matchUpdateTypes": ["patch", "digest"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true
     },
     {
